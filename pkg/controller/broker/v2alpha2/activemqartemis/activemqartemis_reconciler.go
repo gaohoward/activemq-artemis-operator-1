@@ -1220,12 +1220,20 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha2.ActiveMQArtemis) cor
 	pts := pods.MakePodTemplateSpec(namespacedName, selectors.LabelBuilder.Labels())
 	Spec := corev1.PodSpec{}
 	Containers := []corev1.Container{}
+	InitContainers := []corev1.Container{
+		{
+			Name:	"activemq-artemis-init",
+			Image:	"docker-registry.default.svc:5000/aao-artemiscloudpr2-0/activemq-artemis-broker-init:latest",
+			Command:	[]string{"/usr/local/bin/amqcfg", "--help"},
+		},
+	}
 	container := containers.MakeContainer(customResource.Name, customResource.Spec.DeploymentPlan.Image, MakeEnvVarArrayForCR(customResource))
 
 	volumeMounts := MakeVolumeMounts(customResource)
 	if len(volumeMounts) > 0 {
 		container.VolumeMounts = volumeMounts
 	}
+	Spec.InitContainers = InitContainers
 	Spec.Containers = append(Containers, container)
 	volumes := MakeVolumes(customResource)
 	if len(volumes) > 0 {

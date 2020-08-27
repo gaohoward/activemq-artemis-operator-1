@@ -1,4 +1,4 @@
-package v2alpha2activemqartemis
+package v3alpha1activemqartemis
 
 import (
 	"context"
@@ -21,6 +21,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	ss "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	"github.com/artemiscloud/activemq-artemis-operator/version"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/cr2jinja2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1220,13 +1221,19 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha2.ActiveMQArtemis) cor
 	pts := pods.MakePodTemplateSpec(namespacedName, selectors.LabelBuilder.Labels())
 	Spec := corev1.PodSpec{}
 	Containers := []corev1.Container{}
-	InitContainers := []corev1.Container{
+	
+	brokerYaml := cr2jinja2.MakeBrokerCfgOverrides(customResource)
+	
+	InitContainers := []corev1.Container {
 		{
 			Name:	"activemq-artemis-init",
-			Image:	"docker-registry.default.svc:5000/aao-artemiscloudpr2-0/activemq-artemis-broker-init:latest",
-			Command:	[]string{"/usr/local/bin/amqcfg", "--help"},
+			Image:	"quay.io/hgao/init-container:bug2885",
+//			Command:	[]string{"/usr/local/bin/amqcfg", "--help"},
+			Command:	[]string{"/bin/bash"},
+			Args:		[]string{"-c", "echo " + brokerYaml + " > /tools/broker.yaml; "},
 		},
 	}
+
 	container := containers.MakeContainer(customResource.Name, customResource.Spec.DeploymentPlan.Image, MakeEnvVarArrayForCR(customResource))
 
 	volumeMounts := MakeVolumeMounts(customResource)

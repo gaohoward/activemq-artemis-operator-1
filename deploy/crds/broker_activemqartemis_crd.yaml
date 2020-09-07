@@ -34,6 +34,7 @@ spec:
             spec:
               type: object
               properties:
+##### core #####
                 acceptors:
                   description: Configuration of all acceptors
                   type: array
@@ -194,6 +195,2757 @@ spec:
                           Used to change the SSL Provider between JDK and
                           OPENSSL. The default is JDK.
                         type: string
+################
+                name:
+                  description: Broker name. If set, it will be used in topology notifications.
+                  type: string
+                  minItems: 0
+                systemPropertyPrefix:
+                  description: This defines the prefix which we will use to parse System properties for the configuration.
+                  type: string
+                  minItems: 0
+                internalNamingPrefix:
+                  description: >-
+                    Artemis uses internal queues and addresses for implementing certain behaviours.  These queues and addresses
+                    will be prefixed by default with "$.activemq.internal" to avoid naming clashes with user namespacing.
+                    This can be overridden by setting this value to a valid Artemis address.
+                  type: string
+                  minItems: 0
+                amqpUseCoreSubscriptionNaming:
+                  description: >-
+                    This enables making AMQP subscription queue names, match core queue names, for better interoperability 
+                    between protocols. Note: Enabling this to an existing broker if pre-existing amqp durable subscriptions 
+                    already existed will require clients to re-subscribe and to clean up old subscription names.
+                  type: boolean
+                  minItems: 0
+                resolveProtocols:
+                  description: >-
+                    If true then the ActiveMQ Artemis Server will make use of any Protocol Managers that are in available
+                    on the classpath. If false then only the core protocol will be available, unless in Embedded mode
+                    where users can inject their own Protocol Managers.
+                  type: boolean
+                  minItems: 0
+                journalDatasync:
+                  description: that means the server will use fdatasync to confirm writes on the disk.
+                  type: boolean
+                  minItems: 0
+                persistenceEnabled:
+                  description: true means that the server will use the file based journal for persistence.
+                  type: boolean
+                  minItems: 0
+                scheduledThreadPoolMaxSize:
+                  description: Maximum number of threads to use for the scheduled thread pool
+                  type: integer
+                  minItems: 0
+                threadPoolMaxSize:
+                  description: Maximum number of threads to use for the thread pool. -1 means 'no limits'.
+                  type: integer
+                  minItems: 0
+                gracefulShutdownEnabled:
+                  description: true means that graceful shutdown is enabled
+                  type: boolean
+                  minItems: 0
+                gracefulShutdownTimeout:
+                  description: how long (in ms) to wait for clients to disconnect before shutting down the server
+                  type: long
+                  minItems: 0
+                securityEnabled:
+                  description: true means that security is enabled
+                  type: boolean
+                  minItems: 0
+                securityInvalidationInterval:
+                  description: how long (in ms) to wait before invalidating the security cache
+                  type: long
+                  minItems: 0
+                journalLockAcquisitionTimeout:
+                  description: how long (in ms) to wait to acquire a file lock on the journal
+                  type: long
+                  minItems: 0
+                wildCardRoutingEnabled:
+                  description: true means that the server supports wild card routing
+                  type: boolean
+                  minItems: 0
+                managementAddress:
+                  description: >-
+                    the name of the management address to send management messages to. It is prefixed with "jms.queue" so
+                    that JMS clients can send messages to it.
+                  type: string
+                  minItems: 0
+                managementNotificationAddress:
+                  description: the name of the address that consumers bind to receive management notifications
+                  type: string
+                  minItems: 0
+                clusterUser:
+                  description: Cluster username. It applies to all cluster configurations.
+                  type: string
+                  minItems: 0
+                clusterPassword:
+                  description: Cluster password. It applies to all cluster configurations.
+                  type: string
+                  minItems: 0
+                passwordCodec:
+                  description: >-
+                    Class name and its parameters for the Decoder used to decode the masked password. Ignored if
+                    mask-password is false. The format of this property is a full qualified class name optionally followed
+                    by key/value pairs.
+                  type: string
+                  minItems: 0
+                maskPassword:
+                  description: >-
+                    This option controls whether passwords in server configuration need be masked. If set to "true" the
+                    passwords are masked.
+                  type: boolean
+                  minItems: 0
+                logDelegateFactoryClassName:
+                  description: DEPRECATED. the name of the factory class to use for log delegation
+                  type: string
+                  minItems: 0
+                jmxManagementEnabled:
+                  description: true means that the management API is available via JMX
+                  type: boolean
+                  minItems: 0
+                jmxDomain:
+                  description: the JMX domain used to registered ActiveMQ Artemis MBeans in the MBeanServer
+                  type: string
+                  minItems: 0
+                jmxUseBrokerName:
+                  description: Whether or not to use the broker name in the JMX properties
+                  type: boolean
+                  minItems: 0
+                messageCounterEnabled:
+                  description: true means that message counters are enabled
+                  type: boolean
+                  minItems: 0
+                messageCounterSamplePeriod:
+                  description: the sample period (in ms) to use for message counters
+                  type: long
+                  minItems: 0
+                messageCounterMaxDayHistory:
+                  description: how many days to keep message counter history
+                  type: integer
+                  minItems: 0
+                connectionTtlOverride:
+                  description: >-
+                    if set, this will override how long (in ms) to keep a connection alive without receiving a ping. -1
+                    disables this setting.
+                  type: long
+                  minItems: 0
+                connectionTtlCheckInterval:
+                  description: how often (in ms) to check connections for ttl violation
+                  type: long
+                  minItems: 0
+                configurationFileRefreshPeriod:
+                  description: how often (in ms) to check the configuration file for modifications
+                  type: long
+                  minItems: 0
+                asyncConnectionExecutionEnabled:
+                  description: >-
+                    should certain incoming packets on the server be handed off to a thread from the thread pool for
+                    processing or should they be handled on the remoting thread?
+                  type: boolean
+                  minItems: 0
+                transactionTimeout:
+                  description: how long (in ms) before a transaction can be removed from the resource manager after create time
+                  type: long
+                  minItems: 0
+                transactionTimeoutScanPeriod:
+                  description: how often (in ms) to scan for timeout transactions
+                  type: long
+                  minItems: 0
+                messageExpiryScanPeriod:
+                  description: how often (in ms) to scan for expired messages
+                  type: long
+                  minItems: 0
+                messageExpiryThreadPriority:
+                  description: DEPRECATED. the priority of the thread expiring messages
+                  type: integer
+                  minItems: 0
+                addressQueueScanPeriod:
+                  description: how often (in ms) to scan for addresses and queues that need to be deleted
+                  type: long
+                  minItems: 0
+                idCacheSize:
+                  description: the size of the cache for pre-creating message ID's
+                  type: integer
+                  minItems: 0
+                persistIdCache:
+                  description: true means that ID's are persisted to the journal
+                  type: boolean
+                  minItems: 0
+                persistDeliveryCountBeforeDelivery:
+                  description: >-
+                    True means that the delivery count is persisted before delivery. False means that this only happens
+                    after a message has been cancelled.
+                  type: boolean
+                  minItems: 0
+                populateValidatedUser:
+                  description: true means that the server will add the name of the validated user to messages it sends
+                  type: boolean
+                  minItems: 0
+                rejectEmptyValidatedUser:
+                  description: true means that the server will not allow any message that doesn't have a validated user, in JMS this is JMSXUserID
+                  type: boolean
+                  minItems: 0
+                pagingDirectory:
+                  description: the directory to store paged messages in
+                  type: string
+                  minItems: 0
+                bindingsDirectory:
+                  description: the directory to store the persisted bindings to
+                  type: string
+                  minItems: 0
+                createBindingsDir:
+                  description: true means that the server will create the bindings directory on start up
+                  type: boolean
+                  minItems: 0
+                pageMaxConcurrentIo:
+                  description: The max number of concurrent reads allowed on paging
+                  type: integer
+                  minItems: 0
+                readWholePage:
+                  description: Whether the whole page is read while getting message after page cache is evicted.
+                  type: boolean
+                  minItems: 0
+                journalDirectory:
+                  description: the directory to store the journal files in
+                  type: string
+                  minItems: 0
+                nodeManagerLockDirectory:
+                  description: the directory to store the node manager lock file
+                  type: string
+                  minItems: 0
+                createJournalDir:
+                  description: true means that the journal directory will be created
+                  type: boolean
+                  minItems: 0
+                journalBufferTimeout:
+                  description: >-
+                    The timeout (in nanoseconds) used to flush internal buffers on the journal. The exact default value
+                    depend on whether the journal is ASYNCIO or NIO.
+                  type: long
+                  minItems: 0
+                journalDeviceBlockSize:
+                  description: >-
+                    The size in bytes used by the device. This is usually translated as fstat/st_blksize
+                    And this is a way to bypass the value returned as st_blksize.
+                  type: long
+                  minItems: 0
+                journalBufferSize:
+                  description: >-
+                    The size (in bytes) of the internal buffer on the journal. Supports byte notation like "K", "Mb",
+                    "GB", etc.
+                  type: string
+                  minItems: 0
+                journalSyncTransactional:
+                  description: >-
+                    if true wait for transaction data to be synchronized to the journal before returning response to
+                    client
+                  type: boolean
+                  minItems: 0
+                journalSyncNonTransactional:
+                  description: if true wait for non transaction data to be synced to the journal before returning response to client.
+                  type: boolean
+                  minItems: 0
+                logJournalWriteRate:
+                  description: Whether to log messages about the journal write rate
+                  type: boolean
+                  minItems: 0
+                journalFileSize:
+                  description: The size (in bytes) of each journal file. Supports byte notation like "K", "Mb", "GB", etc.
+                  type: string
+                  minItems: 0
+                journalMinFiles:
+                  description: how many journal files to pre-create
+                  type: integer
+                  minItems: 0
+                journalPoolFiles:
+                  description: how many journal files to pre-create
+                  type: integer
+                  minItems: 0
+                journalCompactPercentage:
+                  description: The percentage of live data on which we consider compacting the journal
+                  type: integer
+                  minItems: 0
+                journalCompactMinFiles:
+                  description: The minimal number of data files before we can start compacting
+                  type: integer
+                  minItems: 0
+                journalMaxIo:
+                  description: >-
+                    the maximum number of write requests that can be in the AIO queue at any one time. Default is 500 for
+                    AIO and 1 for NIO.
+                  type: integer
+                  minItems: 0
+                journalFileOpenTimeout:
+                  description: the length of time in seconds to wait when opening a new Journal file before timing out and failing
+                  type: integer
+                  minItems: 0
+                serverDumpInterval:
+                  description: Interval to log server specific information (e.g. memory usage etc)
+                  type: long
+                  minItems: 0
+                globalMaxSize:
+                  description: >-
+                    Size (in bytes) before all addresses will enter into their Full Policy configured upon messages being
+                    produced. Supports byte notation like "K", "Mb", "GB", etc.
+                  type: string
+                  minItems: 0
+                maxDiskUsage:
+                  description: Max percentage of disk usage before the system blocks or fails clients.
+                  type: integer
+                  minItems: 0
+                diskScanPeriod:
+                  description: how often (in ms) to scan the disks for full disks.
+                  type: long
+                  minItems: 0
+                memoryWarningThreshold:
+                  description: Percentage of available memory which will trigger a warning log
+                  type: integer
+                  minItems: 0
+                memoryMeasureInterval:
+                  description: frequency to sample JVM memory in ms (or -1 to disable memory sampling)
+                  type: long
+                  minItems: 0
+                largeMessagesDirectory:
+                  description: the directory to store large messages
+                  type: string
+                  minItems: 0
+                criticalAnalyzer:
+                  description: should analyze response time on critical paths and decide for broker log, shutdown or halt.
+                  type: boolean
+                  minItems: 0
+                criticalAnalyzerTimeout:
+                  description: The default timeout used on analyzing timeouts on the critical path.
+                  type: long
+                  minItems: 0
+                criticalAnalyzerCheckPeriod:
+                  description: The timeout here will be defaulted to half critical-analyzer-timeout, calculation happening at runtime
+                  type: long
+                  minItems: 0
+                pageSyncTimeout:
+                  description: >-
+                    The timeout (in nanoseconds) used to sync pages. The exact default value
+                    depend on whether the journal is ASYNCIO or NIO.
+                  type: integer
+                  minItems: 0
+                networkCheckList:
+                  description: A comma separated list of IPs to be used to validate if the broker should be kept up
+                  type: string
+                  minItems: 0
+                networkCheckURLList:
+                  description: A comma separated list of URLs to be used to validate if the broker should be kept up
+                  type: string
+                  minItems: 0
+                networkCheckPeriod:
+                  description: A frequency in milliseconds to how often we should check if the network is still up
+                  type: long
+                  minItems: 0
+                networkCheckTimeout:
+                  description: A timeout used in milliseconds to be used on the ping.
+                  type: long
+                  minItems: 0
+                networkCheckNIC:
+                  description: The network interface card name to be used to validate the address.
+                  type: string
+                  minItems: 0
+                networkCheckPingCommand:
+                  description: The ping command used to ping IPV4 addresses.
+                  type: string
+                  minItems: 0
+                networkCheckPing6Command:
+                  description: The ping command used to ping IPV6 addresses.
+                  type: string
+                  minItems: 0
+                remotingIncomingInterceptors:
+                  description: a list of &lt;class-name/&gt; elements with the names of classes to use for intercepting incoming remoting packets
+                  type: array
+                  minItems: 0
+                  items:
+                    description: list of interceptor classes
+                    type: object
+                    properties:
+                      className:
+                        description: the fully qualified name of the interceptor class
+                        type: string
+                remotingOutgoingInterceptors:
+                  description: a list of &lt;class-name/&gt; elements with the names of classes to use for intercepting outgoing remoting packets
+                  type: array
+                  minItems: 0
+                  items:
+                    description: list of interceptor classes
+                    type: object
+                    properties:
+                      className:
+                        description: the fully qualified name of the interceptor class
+                        type: string
+                broadcastGroups:
+                  description: definition of broadcast groups
+                  type: object
+                  properties:
+                    broadcastGroup:
+                      description: the broadcast group definition
+                      type: array
+                      minItems: 0
+                      items:
+                        description: all properties of a broadcast group
+                        type: object
+                        properties:
+                          localBindAddress:
+                            description: a local address to which the datagram socket is bound
+                            type: string
+                          localBindPort:
+                            description: a local port to which the datagram socket is bound
+                            type: integer
+                          groupAddress:
+                            description: multicast address to which the data will be broadcast
+                            type: string
+                          groupPort:
+                            description: UDP port number used for broadcasting
+                            type: integer
+                          broadcastPeriod: 
+                            description: period in milliseconds between consecutive broadcasts
+                            type: integer
+                          jgroupsFile: 
+                            description: Name of JGroups configuration file. If specified, the server uses JGroups for broadcasting.
+                            type: string
+                          jgroupsChannel: 
+                            description: Name of JGroups Channel. If specified, the server uses the named channel for broadcasting.
+                            type: string
+                          connectorRef:
+                            description: name of connector
+                            type: array
+                            items:
+                              type: string
+                discoveryGroups:
+                  description: definition of discovery groups
+                  type: object
+                  properties:
+                    discoveryGroup:
+                      description: discovery group configuration parameters
+                      type: array
+                      minItems: 0
+                      items:
+                        description: all parameters
+                        type: object
+                        properties:
+                          groupAddress:
+                            description: Multicast IP address of the group to listen on
+                            type: string
+                          groupPort:
+                            description: UDP port number of the multi cast group
+                            type: integer
+                          jgroupsFile:
+                            description: Name of a JGroups configuration file. If specified, the server uses JGroups for discovery.
+                            type: string
+                          jgroupsChannel:
+                            description: Name of a JGroups Channel. If specified, the server uses the named channel for discovery.
+                            type: string
+                          refreshTimeout:
+                            description: >-
+                              Period the discovery group waits after receiving the last broadcast from a particular server before
+                              removing that servers connector pair entry from its list.
+                            type: integer
+                          localBindAddress:
+                            description: local binding address
+                            type: string
+                          localBindPort:
+                            description: local binding port
+                            type: integer
+                          initialWaitTimeout:
+                            description: time to wait for an initial broadcast to give us at least one node in the cluster
+                            type: integer
+                          name:
+                            description: a unique name for the discovery group
+                            type: string
+                diverts:
+                  description: a list of diverts to use
+                  type: object
+                  properties:
+                    divert:
+                      description: configuration parameters for a divert
+                      type: array
+                      items:
+                        description: parameters for a single divert
+                        type: object
+                        properties:
+                          transformerClassName:
+                            description: an optional class name of a transformer 
+                            type: string
+                          transformer:
+                            description: optional transformer configuration
+                            type: object
+                            properties:
+                              className:
+                                description: optional name of transformer class
+                                type: string
+                              property:
+                                description: properties to configure the transformer class
+                                type: array
+                                items:
+                                  description: properties
+                                  type: object
+                                  properties:
+                                    key:
+                                      description: the property key
+                                      type: string
+                                    value:
+                                      description: the property value
+                                      type: string
+                          exclusive:
+                            description: whether this is an exclusive divert
+                            type: boolean
+                          routingName:
+                            description: the routing name for the divert
+                            type: string
+                          address:
+                            description: the address this divert will divert from
+                            type: string
+                          forwardingAddress:
+                            description: the forwarding address for the divert
+                            type: string
+                          filter:
+                            description: optional core filter expression. Set through attribute
+                            type: object
+                            properties:
+                              string:
+                                description: optional core filter expression
+                                type: string
+                          routingType:
+                            description: how should the routing-type on the diverted messages be set. default is STRIP.
+                            type: string
+                            enum:
+                            - "ANYCAST"
+                            - "MULTICAST"
+                            - "STRIP"
+                            - "PASS"
+                          name:
+                            description: a unique name for the divert.
+                            type: string
+                queues:
+                  description: a list of pre configured queues to create
+                  type: object
+                  properties:
+                    queue:
+                      description: queue configuration
+                      type: array
+                      items:
+                        description: queue configuration parameters
+                        type: object
+                        properties:
+                          address:
+                            description: address for the queue
+                            type: string
+                          user:
+                            description: user to associate for creating the queue
+                            type: string
+                          filter:
+                            description: 
+                            type: object
+                            properties:
+                              string:
+                                description: the filter
+                                type: string
+                          durable:
+                            description: whether the queue is durable
+                            type: boolean
+                          name:
+                            description: unique name of the queue
+                            type: string
+                          maxConsumers:
+                            description: max consumers allowed to a queue
+                            type: integer
+                          purgeOnNoConsumers:
+                            description: whether or not to delete all messages and prevent routing when no consumers are connected
+                            type: boolean
+                          exclusive:
+                            description: only deliver messages to one of the connected consumers
+                            type: boolean
+                          groupRebalance:
+                            description: rebalancing messaging group after new consumers added
+                            type: boolean
+                          groupBuckets:
+                            description: messaging group buckets
+                            type: integer
+                          groupFirstKey:
+                            description: key for the group consumer to receive first group message
+                            type: string
+                          lastValue:
+                            description: whether the queue is a last value queue
+                            type: boolean
+                          lastValueKey:
+                            description: key to the last value queue messages
+                            type: string
+                          nonDestructive:
+                            description: whether consumers are non destructive
+                            type: boolean
+                          consumersBeforeDispatch:
+                            description: consumers before dispatching messages
+                            type: integer
+                          delayBeforeDispatch:
+                            description: delay before dispatch
+                            type: integer
+                bridges:
+                  description: configuration of bridges 
+                  type: object
+                  properties:
+                    bridge:
+                      description: bridge configuration parameters
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          queueName:
+                            description: name of queue that this bridge consumes from
+                            type: string
+                          forwardingAddress:
+                            description: address to forward to. If omitted original address is used
+                            type: string
+                          ha:
+                            description: whether this bridge supports failover
+                            type: boolean
+                          filter:
+                            description: 
+                            type: object
+                            properties:
+                              string:
+                                description: the filter
+                                type: string
+                          transformerClassName:
+                            description: optional name of transformer class
+                            type: string
+                          transformer:
+                            description: optional transformer configuration
+                            type: object
+                            properties:
+                              className:
+                                description: optional name of transformer class
+                                type: string
+                              property:
+                                description: properties to configure the transformer class
+                                type: array
+                                items:
+                                  description: properties
+                                  type: object
+                                  properties:
+                                    key:
+                                      description: the property key
+                                      type: string
+                                    value:
+                                      description: the property value
+                                      type: string
+                          minLargeMessageSize:
+                            description: >-
+                              Any message larger than this size in bytes is considered a large message
+                              Supports byte notation like K, Mb, GB, etc.
+                            type: string
+                          checkPeriod:
+                            description: >-
+                              The period in milliseconds a bridge's client will check if it failed to
+                              receive a ping from the server. -1 disables this check.
+                            type: integer
+                          connectionTtl:
+                            description: >-
+                              how long to keep a connection alive in the absence of any data arriving from the client. This should
+                              be greater than the ping period.
+                            type: integer
+                          retryInterval:
+                            description: period in ms between successive retries
+                            type: integer
+                          retryIntervalMultiplier:
+                            description: multiplier to apply to successive retry intervals
+                            type: number
+                          maxRetryInterval:
+                            description: Limit to the retry-interval growth due to retry-interval-multiplier
+                            type: integer
+                          initialConnectAttempts:
+                            description: maximum number of initial connection attempts, -1 means 'no limits'
+                            type: integer
+                          reconnectAttempts:
+                            description: maximum number of retry attempts, -1 means 'no limits'
+                            type: integer
+                          failoverOnServerShutdown:
+                            description: should failover be prompted if target server is cleanly shutdown?
+                            type: boolean
+                          useDuplicateDetection:
+                            description: should duplicate detection headers be inserted in forwarded messages?
+                            type: boolean
+                          confirmationWindowSize:
+                            description: >-
+                              Once the bridge has received this many bytes, it sends a confirmation. 
+                              Supports byte notation like K, Mb, GB, etc.
+                            type: string
+                          producerWindowSize:
+                            description: Producer flow control. Supports byte notation like K, Mb, GB, etc.
+                            type: string
+                          user:
+                            description: username, if unspecified the cluster-user is used
+                            type: string
+                          password:
+                            description: password, if unspecified the cluster-password is used
+                            type: string
+                          reconnectAttemptsSameNode:
+                            description: >-
+                              Upon reconnection this configures the number of time the same node on the topology will be retried
+                              before resetting the server locator and using the initial connectors
+                            type: integer
+                          routingType:
+                            description: how should the routing-type on the bridged messages be set
+                            type: string
+                            enum:
+                            - "ANYCAST"
+                            - "MULTICAST"
+                            - "STRIP"
+                            - "PASS"
+                          staticConnectors:
+                            description: list of connectors used by bridge
+                            type: object
+                            properties:
+                              connectorRef:
+                                description: connector names
+                                type: array
+                                items:
+                                  type: string
+                          discoveryGroupRef:
+                            description: name of discovery group used by this bridge
+                            type: object
+                            properties:
+                              discoveryGroupName:
+                                description: discovery group name
+                                type: string # xsd:IDREF
+                          name:
+                            description: unique name for this bridge
+                            type: string
+                federations:
+                  description: a list of federations to create
+                  type: object
+                  properties:
+                    federation:
+                      description: federation configuration
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          upstream:
+                            description: upstream configuration parameters
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                ha:
+                                  description: whether this connection supports fail-over
+                                  type: boolean
+                                circuitBreakerTimeout:
+                                  description: >-
+                                    in milliseconds, When a connection issue occurs, 
+                                    as the single connection is shared by many federated queue and address consumers, 
+                                    to avoid each one trying to reconnect and possibly causing a thundering heard issue, 
+                                    the first one will try, if unsuccessful the circuit breaker will open, 
+                                    returning the same exception to all, this is the timeout until the circuit can be closed and connection retried.
+                                  type: integer
+                                shareConnection:
+                                  description: >-
+                                    if there is a downstream and upstream connection configured for the same broker then
+                                    the same connection will be shared as long as both stream configs set this flag to true
+                                  type: boolean
+                                connectionTtl:
+                                  description: >-
+                                    how long to keep a connection alive in the absence of any data arriving from the client
+                                  type: integer
+                                callTimeout:
+                                  description: How long to wait for a reply
+                                  type: integer
+                                retryInterval:
+                                  description: period in ms between successive retries
+                                  type: integer
+                                retryIntervalMultiplier:
+                                  description: multiplier to apply to the retry-interval
+                                  type: number
+                                maxRetryInterval:
+                                  description: Maximum value for retry-interval
+                                  type: integer
+                                initialConnectAttempts:
+                                  description: How many attempts should be made to connect initially
+                                  type: integer
+                                reconnectAttempts:
+                                  description: How many attempts should be made to reconnect after failure
+                                  type: integer
+                                checkPeriod:
+                                  description: The period in milliseconds used to check if the federation connection has failed to receive pings from another server
+                                  type: integer
+                                callFailoverTimeout:
+                                  description: How long to wait for a reply if in the middle of a failover. -1 means wait forever.
+                                  type: integer
+                                staticConnectors:
+                                  description: static connectors used by federation
+                                  type: object
+                                  properties:
+                                    connectorRef:
+                                      description: the connector
+                                      type: array
+                                      items:
+                                        type: string
+                                discoveryGroupRef:
+                                  description: discovery group used by federation
+                                  type: object
+                                  properties:
+                                    discoveryGroupName:
+                                      description: name of the discovery group
+                                      type: string
+                                policy:
+                                  description: federation policies
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      ref:
+                                        description: policy reference
+                                        type: string
+                                priorityAdjustment:
+                                  description: priority adjustment
+                                  type: integer
+                                user:
+                                  description: username, if unspecified the federated user is used
+                                  type: string
+                                password:
+                                  description: password, if unspecified the federated password is used
+                                  type: string
+                                name:
+                                  description: unique name for this upstream
+                                  type: string
+                          downstream:
+                            description: 
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                ha:
+                                  description: whether this connection supports fail-over
+                                  type: boolean
+                                circuitBreakerTimeout:
+                                  description: >-
+                                    in milliseconds, When a connection issue occurs, 
+                                    as the single connection is shared by many federated queue and address consumers, 
+                                    to avoid each one trying to reconnect and possibly causing a thundering heard issue, 
+                                    the first one will try, if unsuccessful the circuit breaker will open, 
+                                    returning the same exception to all, this is the timeout until the circuit can be closed and connection retried.
+                                  type: integer
+                                shareConnection:
+                                  description: >-
+                                    if there is a downstream and upstream connection configured for the same broker then
+                                    the same connection will be shared as long as both stream configs set this flag to true
+                                  type: boolean
+                                connectionTtl:
+                                  description: >-
+                                    how long to keep a connection alive in the absence of any data arriving from the client
+                                  type: integer
+                                callTimeout:
+                                  description: How long to wait for a reply
+                                  type: integer
+                                retryInterval:
+                                  description: period in ms between successive retries
+                                  type: integer
+                                retryIntervalMultiplier:
+                                  description: multiplier to apply to the retry-interval
+                                  type: number
+                                maxRetryInterval:
+                                  description: Maximum value for retry-interval
+                                  type: integer
+                                initialConnectAttempts:
+                                  description: How many attempts should be made to connect initially
+                                  type: integer
+                                reconnectAttempts:
+                                  description: How many attempts should be made to reconnect after failure
+                                  type: integer
+                                checkPeriod:
+                                  description: The period in milliseconds used to check if the federation connection has failed to receive pings from another server
+                                  type: integer
+                                callFailoverTimeout:
+                                  description: How long to wait for a reply if in the middle of a failover. -1 means wait forever.
+                                  type: integer
+                                staticConnectors:
+                                  description: static connectors used by federation
+                                  type: object
+                                  properties:
+                                    connectorRef:
+                                      description: the connector
+                                      type: array
+                                      items:
+                                        type: string
+                                discoveryGroupRef:
+                                  description: discovery group used by federation
+                                  type: object
+                                  properties:
+                                    discoveryGroupName:
+                                      description: name of the discovery group
+                                      type: string
+                                policy:
+                                  description: federation policies
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      ref:
+                                        description: policy reference
+                                        type: string
+                                priorityAdjustment:
+                                  description: priority adjustment
+                                  type: integer
+                                user:
+                                  description: username, if unspecified the federated user is used
+                                  type: string
+                                password:
+                                  description: password, if unspecified the federated password is used
+                                  type: string
+                                name:
+                                  description: unique name for this upstream
+                                  type: string
+                                upstreamConnectorRef:
+                                  description: >-
+                                    Name of the transport connector reference to use for the new upstream connection
+                                    back to this broker.
+                                  type: string
+                          policySet:
+                            description: policy set
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                policy:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      ref:
+                                        description: policy reference
+                                        type: string
+                                name:
+                                  description: policy name
+                                  type: string
+                          queuePolicy:
+                            description: queue policy type
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                include:
+                                  description: the address-match pattern to whitelist addresses, multiple of these can be set. If none are set all addresses are matched.
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      queueMatch:
+                                        description: queue matching expression
+                                        type: string
+                                      addressMatch:
+                                        description: address matching expression
+                                        type: string
+                                exclude:
+                                  description: the address-match pattern to blacklist addresses, multiple of these can be set.
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      queueMatch:
+                                        description: queue matching expression
+                                        type: string
+                                      addressMatch:
+                                        description: address matching expression
+                                        type: string
+                                transformerRef:
+                                  description: transformer reference
+                                  type: string
+                                priorityAdjustment:
+                                  description: >-
+                                    when a consumer attaches its priority is used to make the upstream consumer, 
+                                    but with an adjustment by default -1, so that local consumers get load balanced
+                                    first over remote, this enables this to be configurable should it be wanted. 
+                                  type: integer
+                                includeFederated:
+                                  description: >-
+                                    whether to federate a consumer. by default this is false
+                                  type: boolean
+                                name:
+                                  description: name of the policy set
+                                  type: string
+                          addressPolicy:
+                            description: 
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                include:
+                                  description: whitelist expressions
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      addressMatch:
+                                        type: string
+                                exclude:
+                                  description: blacklist expressions
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      addressMatch:
+                                        type: string
+                                transformerRef:
+                                  description: transformer reference
+                                  type: string
+                                autoDelete:
+                                  description: >-
+                                    For address federation, the downstream dynamically creates a durable queue on the upstream address. 
+                                    This is used to mark if the upstream queue should be deleted once downstream disconnects, 
+                                    and the delay and message count params have been met. 
+                                  type: boolean
+                                autoDeleteDelay:
+                                  description: The amount of time in milliseconds after the downstream broker has disconnected before the upstream queue can be eligable for auto-delete.
+                                  type: integer
+                                autoDeleteMessageCount:
+                                  description: >-
+                                    The amount messages in the upstream queue that the message count must be equal 
+                                    or below before the downstream broker has disconnected before the upstream queue 
+                                    can be eligable for auto-delete.
+                                  type: integer
+                                maxHops:
+                                  description: The number of hops that a message can have made for it to be federated
+                                  type: integer
+                                name:
+                                  description: unique name of the policy
+                                  type: string
+                                enableDivertBindings:
+                                  description: >-
+                                    Setting to true will enable divert bindings to be listened for demand. 
+                                    Default is false
+                                  type: boolean
+                          transformer:
+                            description: configuration for a transformer
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                className:
+                                  description: the transformer class name
+                                  type: string
+                                property:
+                                  description: properties to configure the transformer class
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      key:
+                                        description: the property key
+                                        type: string
+                                      value:
+                                        description: the property value
+                                        type: string
+                                name:
+                                  description: name of the transformer
+                                  type: string
+                          name:
+                            description: federation name 
+                            type: string
+                          user:
+                            description: federation user name
+                            type: string
+                          password:
+                            description: federation password
+                            type: string
+                haPolicy:
+                  description: HA policies configuration
+                  type: object
+                  properties:
+                    liveOnly:
+                      description: A live only server with no HA capabilities apart from scale down
+                      type: object
+                      properties:
+                        scaleDown:
+                          #id: "urn:jsonschema:activemq:core:ScaleDownType"
+                          description: The scale down configuration of this live server.
+                          type: object
+                          properties:
+                            enabled:
+                              description: >-
+                                its possible that you only want a server to partake in scale down as a receiver, via a group.
+                                In this case set scale-down to false
+                              type: boolean
+                            groupName:
+                              description: >-
+                                The scale down group to scale down to, a server will only scale down to a server within the same group
+                              type: string
+                            discoveryGroupRef:
+                              description: discovery group configuration
+                              type: object
+                              properties:
+                                discoveryGroupName:
+                                  description: >-
+                                    The discovery group to use for scale down, if not supplied then the scale-down-connectors or
+                                    first invm connector will be used
+                                  type: string
+                            connectors:
+                              description: >-
+                                A list of connectors to use for scaling down, if not supplied then the scale-down-discovery-group
+                                or first invm connector will be used
+                              type: object
+                              properties:
+                                connectorRef:
+                                  description: connectors
+                                  type: array
+                                  items:
+                                    type: string
+                    replication:
+                      description: Configuration for a replicated server, either master, slave or colocated.
+                      type: object
+                      properties:
+                        master:
+                          description: A live server configured to replicate.
+                          type: object
+                          properties:
+                            groupName:
+                              description: >-
+                                used for replication, if set, remote backup servers will only pair with 
+                                live servers with matching group-name
+                              type: string
+                            clusterName:
+                              description: >-
+                                Name of the cluster configuration to use for replication. This setting is only necessary in case you
+                                configure multiple cluster connections. It is used by a replicating backups and by live servers that
+                                may attempt fail-back.
+                              type: string
+                            checkForLiveServer:
+                              description: >-
+                                Whether to check the cluster for a (live) server using our own server ID when starting
+                                up. This option is only necessary for performing 'fail-back' on replicating
+                                servers. Strictly speaking this setting only applies to live servers and not to
+                                backups.
+                              type: boolean
+                            initialReplicationSyncTimeout:
+                              description: >-
+                                The amount of time to wait for the replica to acknowledge it has received all the necessary data from
+                                the replicating server at the final step of the initial replication synchronization process.
+                              type: integer
+                            voteOnReplicationFailure:
+                              description: Whether or not this live broker should vote to remain as live if replication is lost
+                              type: boolean
+                            quorumSize:
+                              description: The quorum size used for voting after replication loss, -1 means use the current cluster size
+                              type: integer
+                            voteRetries:
+                              description: >-
+                                If we start as a replica and lose connection to the master, how many times should we attempt to vote
+                                for quorum before restarting
+                              type: integer
+                            voteRetryWait:
+                              description: How long to wait (in milliseconds) between each vote
+                              type: integer
+                            quorumVoteWait:
+                              description: How long to wait (in seconds) for vote results
+                              type: integer
+                            retryReplicationWait:
+                              description: >-
+                                If we start as a replica how long to wait (in milliseconds) 
+                                before trying to replicate again after failing to find a replica
+                              type: integer
+                        slave:
+                          description: A backup server configured to replicate
+                          type: object
+                          properties:
+                            groupName:
+                              description: >-
+                                used for replication, if set, (remote) backup servers will only pair with live servers with matching
+                                group-name
+                              type: string
+                            clusterName:
+                              description: >-
+                                Name of the cluster configuration to use for replication. This setting is only necessary in case you
+                                configure multiple cluster connections. It is used by a replicating backups and by live servers that
+                                may attempt fail-back.
+                              type: string
+                            maxSavedReplicatedJournalsSize:
+                              description: >-
+                                This specifies how many times a replicated backup server can restart after moving its files on start.
+                                Once there are this number of backup journal files the server will stop permanently after if fails
+                                back.
+                              type: integer
+                            scaleDown:
+                              description: if provided then this backup will scale down rather than becoming live after fail over.
+                              type: object
+                              properties:
+                                enabled:
+                                  description: >-
+                                    its possible that you only want a server to partake in scale down as a receiver, via a group.
+                                    In this case set scale-down to false
+                                  type: boolean
+                                groupName:
+                                  description: >-
+                                    The scale down group to scale down to, a server will only scale down to a server within the same group
+                                  type: string
+                                discoveryGroupRef:
+                                  description: discovery group configuration
+                                  type: object
+                                  properties:
+                                    discoveryGroupName:
+                                      description: >-
+                                        The discovery group to use for scale down, if not supplied then the scale-down-connectors or
+                                        first invm connector will be used
+                                      type: string
+                                connectors:
+                                  description: >-
+                                    A list of connectors to use for scaling down, if not supplied then the scale-down-discovery-group
+                                    or first invm connector will be used
+                                  type: object
+                                  properties:
+                                    connectorRef:
+                                      description: connectors
+                                      type: array
+                                      items:
+                                        type: string
+                            restartBackup:
+                              description: Will this server, if a backup, restart once it has been stopped because of failback or scaling down.
+                              type: boolean
+                            allowFailback:
+                              description: >-
+                                Whether a server will automatically stop when a another places a request to take over
+                                its place. The use case is when a regular server stops and its backup takes over its
+                                duties, later the main server restarts and requests the server (the former backup) to
+                                stop operating.
+                              type: boolean
+                            failbackDelay:
+                              description: >-
+                                DEPRECATED. if we have to start as a replicated server this is the delay to wait before fail-back
+                                occurs
+                              type: integer
+                            initialReplicationSyncTimeout:
+                              description: >-
+                                If we have to start as a replicated server this is the amount of time to wait for the replica to
+                                acknowledge it has received all the necessary data from the replicating server at the final step
+                                of the initial replication synchronization process.
+                              type: integer
+                            voteOnReplicationFailure:
+                              description: >-
+                                If we have to start as a replicated server decide whether or not this live broker should vote to remain
+                                as live if replication is lost.
+                              type: boolean
+                            quorumSize:
+                              description: >-
+                                If we have to start as a replicated server or we are a backup and lose connection to live, the quorum size
+                                used for voting after replication loss, -1 means use the current cluster size
+                              type: integer
+                            voteRetries:
+                              description: If we lose connection to the master, how many times should we attempt to vote for quorum before restarting
+                              type: integer
+                            voteRetryWait:
+                              description: How long to wait (in milliseconds) between each vote
+                              type: integer
+                            retryReplicationWait:
+                              description: How long to wait (in milliseconds) before trying to replicate again after failing to find a replica
+                              type: integer
+                            quorumVoteWait:
+                              description: How long to wait (in seconds) for vote results
+                              type: integer
+                        colocated:
+                          description: a colocated server 
+                          type: object
+                          #id: "urn:jsonschema:activemq:core:HaColocationReplicationType"
+                          properties:
+                            requestBackup:
+                              description: If true then the server will request a backup on another node
+                              type: boolean
+                            backupRequestRetries:
+                              description: How many times the live server will try to request a backup, -1 means for ever.
+                              type: integer
+                            backupRequestRetryInterval:
+                              description: How long to wait for retries between attempts to request a backup server.
+                              type: integer
+                            maxBackups:
+                              description: Whether or not this live server will accept backup requests from other live servers.
+                              type: integer
+                            backupPortOffset:
+                              description: The offset to use for the Connectors and Acceptors when creating a new backup server.
+                              type: integer
+                            excludes:
+                              description: 
+                              type: object
+                              properties:
+                                connectorRef:
+                                  description: >-
+                                    the connectors that shouldn't have their ports offset, typically remote connectors or the
+                                    connector used in the cluster connection if scaling down
+                                  type: array
+                                  items:
+                                    type: string
+                            master:
+                              #$ref: "urn:jsonschema:activemq:core:ReplicatedPolicyType"
+                              description: a live server
+                              type: object
+                              properties:
+                                groupName:
+                                  description: >-
+                                    used for replication, if set, remote backup servers will only pair with 
+                                    live servers with matching group-name
+                                  type: string
+                                clusterName:
+                                  description: >-
+                                    Name of the cluster configuration to use for replication. This setting is only necessary in case you
+                                    configure multiple cluster connections. It is used by a replicating backups and by live servers that
+                                    may attempt fail-back.
+                                  type: string
+                                checkForLiveServer:
+                                  description: >-
+                                    Whether to check the cluster for a (live) server using our own server ID when starting
+                                    up. This option is only necessary for performing 'fail-back' on replicating
+                                    servers. Strictly speaking this setting only applies to live servers and not to
+                                    backups.
+                                  type: boolean
+                                initialReplicationSyncTimeout:
+                                  description: >-
+                                    The amount of time to wait for the replica to acknowledge it has received all the necessary data from
+                                    the replicating server at the final step of the initial replication synchronization process.
+                                  type: integer
+                                voteOnReplicationFailure:
+                                  description: Whether or not this live broker should vote to remain as live if replication is lost
+                                  type: boolean
+                                quorumSize:
+                                  description: The quorum size used for voting after replication loss, -1 means use the current cluster size
+                                  type: integer
+                                voteRetries:
+                                  description: >-
+                                    If we start as a replica and lose connection to the master, how many times should we attempt to vote
+                                    for quorum before restarting
+                                  type: integer
+                                voteRetryWait:
+                                  description: How long to wait (in milliseconds) between each vote
+                                  type: integer
+                                quorumVoteWait:
+                                  description: How long to wait (in seconds) for vote results
+                                  type: integer
+                                retryReplicationWait:
+                                  description: >-
+                                    If we start as a replica how long to wait (in milliseconds) 
+                                    before trying to replicate again after failing to find a replica
+                                  type: integer
+                            slave:
+                              #$ref: "urn:jsonschema:activemq:core:ReplicaPolicyType"
+                              description: A backup server configured to replicate
+                              type: object
+                              properties:
+                                groupName:
+                                  description: >-
+                                    used for replication, if set, (remote) backup servers will only pair with live servers with matching
+                                    group-name
+                                  type: string
+                                clusterName:
+                                  description: >-
+                                    Name of the cluster configuration to use for replication. This setting is only necessary in case you
+                                    configure multiple cluster connections. It is used by a replicating backups and by live servers that
+                                    may attempt fail-back.
+                                  type: string
+                                maxSavedReplicatedJournalsSize:
+                                  description: >-
+                                    This specifies how many times a replicated backup server can restart after moving its files on start.
+                                    Once there are this number of backup journal files the server will stop permanently after if fails
+                                    back.
+                                  type: integer
+                                scaleDown:
+                                  description: if provided then this backup will scale down rather than becoming live after fail over.
+                                  type: object
+                                  properties:
+                                    enabled:
+                                      description: >-
+                                        its possible that you only want a server to partake in scale down as a receiver, via a group.
+                                        In this case set scale-down to false
+                                      type: boolean
+                                    groupName:
+                                      description: >-
+                                        The scale down group to scale down to, a server will only scale down to a server within the same group
+                                      type: string
+                                    discoveryGroupRef:
+                                      description: discovery group configuration
+                                      type: object
+                                      properties:
+                                        discoveryGroupName:
+                                          description: >-
+                                            The discovery group to use for scale down, if not supplied then the scale-down-connectors or
+                                            first invm connector will be used
+                                          type: string
+                                    connectors:
+                                      description: >-
+                                        A list of connectors to use for scaling down, if not supplied then the scale-down-discovery-group
+                                        or first invm connector will be used
+                                      type: object
+                                      properties:
+                                        connectorRef:
+                                          description: connectors
+                                          type: array
+                                          items:
+                                            type: string
+                                restartBackup:
+                                  description: Will this server, if a backup, restart once it has been stopped because of failback or scaling down.
+                                  type: boolean
+                                allowFailback:
+                                  description: >-
+                                    Whether a server will automatically stop when a another places a request to take over
+                                    its place. The use case is when a regular server stops and its backup takes over its
+                                    duties, later the main server restarts and requests the server (the former backup) to
+                                    stop operating.
+                                  type: boolean
+                                failbackDelay:
+                                  description: >-
+                                    DEPRECATED. if we have to start as a replicated server this is the delay to wait before fail-back
+                                    occurs
+                                  type: integer
+                                initialReplicationSyncTimeout:
+                                  description: >-
+                                    If we have to start as a replicated server this is the amount of time to wait for the replica to
+                                    acknowledge it has received all the necessary data from the replicating server at the final step
+                                    of the initial replication synchronization process.
+                                  type: integer
+                                voteOnReplicationFailure:
+                                  description: >-
+                                    If we have to start as a replicated server decide whether or not this live broker should vote to remain
+                                    as live if replication is lost.
+                                  type: boolean
+                                quorumSize:
+                                  description: >-
+                                    If we have to start as a replicated server or we are a backup and lose connection to live, the quorum size
+                                    used for voting after replication loss, -1 means use the current cluster size
+                                  type: integer
+                                voteRetries:
+                                  description: If we lose connection to the master, how many times should we attempt to vote for quorum before restarting
+                                  type: integer
+                                voteRetryWait:
+                                  description: How long to wait (in milliseconds) between each vote
+                                  type: integer
+                                retryReplicationWait:
+                                  description: How long to wait (in milliseconds) before trying to replicate again after failing to find a replica
+                                  type: integer
+                                quorumVoteWait:
+                                  description: How long to wait (in seconds) for vote results
+                                  type: integer
+                    sharedStore:
+                      description: Configuration for a shared store server, either master, slave or colocated.
+                      type: object
+                      #id: "urn:jsonschema:activemq:core:HaSharedStoreType"
+                      properties:
+                        master:
+                          #id: "urn:jsonschema:activemq:core:SharedStoreMasterPolicyType"
+                          description: A shared store live server configuration.
+                          type: object
+                          properties:
+                            failbackDelay:
+                              description: DEPRECATED. delay to wait before fail-back occurs on (live's) restart
+                              type: integer
+                            failoverOnShutdown:
+                              description: Will this backup server come live on a normal server shutdown
+                              type: boolean
+                            waitForActivation:
+                              description: Will the master startup wait until it is activated
+                              type: boolean
+                        slave:
+                          #id: "urn:jsonschema:activemq:core:SharedStoreSlavePolicyType"
+                          description: A shared store backup server configuration
+                          type: object
+                          properties:
+                            allowFailback:
+                              description: >-
+                                Whether a server will automatically stop when a another places a request to take over
+                                its place. The use case is when a regular server stops and its backup takes over its
+                                duties, later the main server restarts and requests the server (the former backup) to
+                                stop operating.
+                              type: boolean
+                            failbackDelay:
+                              description: DEPRECATED. delay to wait before fail-back occurs on (live's) restart
+                              type: integer
+                            failoverOnShutdown:
+                              description: Will this backup server come live on a normal server shutdown
+                              type: boolean
+                            scaleDown:
+                              #$ref: "urn:jsonschema:activemq:core:ScaleDownType"
+                              description: The scale down configuration of this live server.
+                              type: object
+                              properties:
+                                enabled:
+                                  description: >-
+                                    its possible that you only want a server to partake in scale down as a receiver, via a group.
+                                    In this case set scale-down to false
+                                  type: boolean
+                                groupName:
+                                  description: >-
+                                    The scale down group to scale down to, a server will only scale down to a server within the same group
+                                  type: string
+                                discoveryGroupRef:
+                                  description: discovery group configuration
+                                  type: object
+                                  properties:
+                                    discoveryGroupName:
+                                      description: >-
+                                        The discovery group to use for scale down, if not supplied then the scale-down-connectors or
+                                        first invm connector will be used
+                                      type: string
+                                connectors:
+                                  description: >-
+                                    A list of connectors to use for scaling down, if not supplied then the scale-down-discovery-group
+                                    or first invm connector will be used
+                                  type: object
+                                  properties:
+                                    connectorRef:
+                                      description: connectors
+                                      type: array
+                                      items:
+                                        type: string
+                            restartBackup:
+                              description: Will this server, if a backup, restart once it has been stopped because of failback or scaling down.
+                              type: boolean
+                        colocated:
+                          #id: "urn:jsonschema:activemq:core:HaColocationSharedStoreType"
+                          description: A shared store colocated configuration
+                          type: object
+                          properties:
+                            requestBackup:
+                              description: If true then the server will request a backup on another node
+                              type: boolean
+                            backupRequestRetries:
+                              description: How many times the live server will try to request a backup, -1 means for ever.
+                              type: integer
+                            backupRequestRetryInterval:
+                              description: How long to wait for retries between attempts to request a backup server.
+                              type: integer
+                            maxBackups:
+                              description: Max number of backups.
+                              type: integer
+                            backupPortOffset:
+                              description: The offset to use for the Connectors and Acceptors when creating a new backup server.
+                              type: integer
+                            master:
+                              # $ref: "urn:jsonschema:activemq:core:SharedStoreMasterPolicyType"
+                              description: A shared store live server configuration.
+                              type: object
+                              properties:
+                                failbackDelay:
+                                  description: DEPRECATED. delay to wait before fail-back occurs on (live's) restart
+                                  type: integer
+                                failoverOnShutdown:
+                                  description: Will this backup server come live on a normal server shutdown
+                                  type: boolean
+                                waitForActivation:
+                                  description: Will the master startup wait until it is activated
+                                  type: boolean
+                            slave:
+                              # $ref: "urn:jsonschema:activemq:core:SharedStoreSlavePolicyType"
+                              description: A shared store backup server configuration
+                              type: object
+                              properties:
+                                allowFailback:
+                                  description: >-
+                                    Whether a server will automatically stop when a another places a request to take over
+                                    its place. The use case is when a regular server stops and its backup takes over its
+                                    duties, later the main server restarts and requests the server (the former backup) to
+                                    stop operating.
+                                  type: boolean
+                                failbackDelay:
+                                  description: DEPRECATED. delay to wait before fail-back occurs on (live's) restart
+                                  type: integer
+                                failoverOnShutdown:
+                                  description: Will this backup server come live on a normal server shutdown
+                                  type: boolean
+                                scaleDown:
+                                  #$ref: "urn:jsonschema:activemq:core:ScaleDownType"
+                                  description: The scale down configuration of this live server.
+                                  type: object
+                                  properties:
+                                    enabled:
+                                      description: >-
+                                        its possible that you only want a server to partake in scale down as a receiver, via a group.
+                                        In this case set scale-down to false
+                                      type: boolean
+                                    groupName:
+                                      description: >-
+                                        The scale down group to scale down to, a server will only scale down to a server within the same group
+                                      type: string
+                                    discoveryGroupRef:
+                                      description: discovery group configuration
+                                      type: object
+                                      properties:
+                                        discoveryGroupName:
+                                          description: >-
+                                            The discovery group to use for scale down, if not supplied then the scale-down-connectors or
+                                            first invm connector will be used
+                                          type: string
+                                    connectors:
+                                      description: >-
+                                        A list of connectors to use for scaling down, if not supplied then the scale-down-discovery-group
+                                        or first invm connector will be used
+                                      type: object
+                                      properties:
+                                        connectorRef:
+                                          description: connectors
+                                          type: array
+                                          items:
+                                            type: string
+                                restartBackup:
+                                  description: Will this server, if a backup, restart once it has been stopped because of failback or scaling down.
+                                  type: boolean
+                clusterConnections:
+                  # id: "urn:jsonschema:activemq:core:ClusterConnectionChoiceType"
+                  # in xsd this is a choice type
+                  description: a list of cluster connections
+                  type: object
+                  properties:
+                    clusterConnectionUri:
+                      description: cluster connection uri string
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          address:
+                            description: uri of the cluster connection
+                            type: string
+                          name:
+                            description: name of the cluster connection
+                            type: string
+                    clusterConnection:
+                      description: cluster connection configuration
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          address:
+                            description: name of the address this cluster connection applies to
+                            type: string
+                          connectorRef:
+                            description: Name of the connector reference to use.
+                            type: string
+                          checkPeriod:
+                            description: >-
+                              The period (in milliseconds) used to check if the cluster connection has failed to receive pings from
+                              another server
+                            type: integer
+                          connectionTtl:
+                            description: how long to keep a connection alive in the absence of any data arriving from the client
+                            type: integer
+                          minLargeMessageSize:
+                            description: >-
+                              Messages larger than this are considered large-messages. Supports byte notation like
+                              K, Mb, GB, etc.
+                            type: integer
+                          callTimeout:
+                            description: How long to wait for a reply
+                            type: integer
+                          retryInterval:
+                            description: period (in ms) between successive retries
+                            type: integer
+                          retryIntervalMultiplier:
+                            description: multiplier to apply to the retry-interval
+                            type: integer
+                          maxRetryInterval:
+                            description: Maximum value for retry-interval
+                            type: integer
+                          initialConnectAttempts:
+                            description: How many attempts should be made to connect initially
+                            type: integer
+                          reconnectAttempts:
+                            description: How many attempts should be made to reconnect after failure
+                            type: integer
+                          useDuplicateDetection:
+                            description: should duplicate detection headers be inserted in forwarded messages?
+                            type: boolean
+                          forwardWhenNoConsumers:
+                            description: >-
+                              DEPRECATED. use message-load-balancing-type instead. Select STRICT to mimic
+                              forward-when-no-consumers=true and ON_DEMAND to mimic forward-when-no-consumers=false.
+                            type: boolean
+                          messageLoadBalancing:
+                            description: how should messages be load balanced between servers in a cluster?
+                            type: string
+                            enum:
+                            - "OFF"
+                            - "STRICT"
+                            - "ON_DEMAND"
+                          maxHops:
+                            description: maximum number of hops cluster topology is propagated
+                            type: integer
+                          confirmationWindowSize:
+                            description: >-
+                              The size (in bytes) of the window used for confirming data from the server connected to. Supports
+                              byte notation like K, Mb, GB, etc.
+                            type: integer
+                          producerWindowSize:
+                            description: Producer flow control. Supports byte notation like K, Mb, GB, etc.
+                            type: integer
+                          callFailoverTimeout:
+                            description: How long to wait for a reply if in the middle of a failover. -1 means wait forever.
+                            type: integer
+                          notificationInterval:
+                            description: >-
+                              how often the cluster connection will notify the cluster of its existence right after joining the
+                              cluster
+                            type: integer
+                          notificationAttempts:
+                            description: >-
+                              how many times this cluster connection will notify the cluster of its existence right after joining
+                              the cluster
+                            type: integer
+                          scaleDownConnector:
+                            description: The connector to use for scaling down or when as backup in SCALE_DOWN mode
+                            type: string
+                          staticConnectors:
+                            description: list of static connectors
+                            type: object
+                            properties:
+                              connectorRef:
+                                description: the connector reference
+                                type: array
+                                items:
+                                  type: string
+                              allowDirectConnectionsOnly:
+                                description: restricts cluster connections to the listed connectorRefs
+                                type: boolean
+                          discoveryGroupRef:
+                            description: discovery group to use
+                            type: object
+                            properties:
+                              discoveryGroupName:
+                                description: name of discovery group used by this cluster connection
+                                type: string
+                          name:
+                            description: unique name for this cluster connection
+                            type: string
+                          uri:
+                            description: The URI for the cluster connection options
+                            type: string
+                groupingHandler:
+                  #id: "urn:jsonschema:activemq:core:GroupingHandlerType"
+                  description: Message Group configuration
+                  type: object
+                  properties:
+                    type:
+                      description: >-
+                        Each cluster should choose 1 node to have a LOCAL grouping handler and all the other nodes should have
+                        REMOTE handlers
+                      type: string
+                      enum:
+                      - "LOCAL"
+                      - "REMOTE"
+                    address:
+                      description: A reference to a cluster connection address
+                      type: string
+                    timeout:
+                      description: How long to wait for a decision
+                      type: integer
+                    groupTimeout:
+                      description: >-
+                        How long a group binding will be used, -1 means for ever. Bindings are removed after this wait
+                        elapses. On the remote node this is used to determine how often you should re-query the main
+                        coordinator in order to update the last time used accordingly.
+                      type: integer
+                    reaperPeriod:
+                      description: How often the reaper will be run to check for timed out group bindings. Only valid for LOCAL handlers
+                      type: integer
+                    name:
+                      description: A name identifying this grouping-handler
+                      type: string
+                store:
+                  description: >-
+                    The Store Type used by the server. Either fileStore or databaseStore.
+                    not both. fileStore here is defined as string, but value doesn't matter.
+                  type: object
+                  #id: "urn:jsonschema:activemq:core:StoreType"
+                  properties:
+                    fileStore:
+                      description: Using file store. 
+                      type: string
+                      #id: "urn:jsonschema:activemq:core:FileStoreType"
+                    databaseStore:
+                      description: Using database store
+                      type: object
+                      #id: "urn:jsonschema:activemq:core:DatabaseStoreType"
+                      properties:
+                        jdbcDriverClassName:
+                          description: The JDBC Driver class name
+                          type: string
+                        jdbcConnectionUrl:
+                          description: The JDBC Connection URL
+                          type: string
+                        jdbcUser:
+                          description: The JDBC User to use for connecting to the database
+                          type: string
+                        jdbcPassword:
+                          description: The password
+                          type: string
+                        messageTableName:
+                          description: The table name used to store message journal entries
+                          type: string
+                        bindingsTableName:
+                          description: The table name used to store bindings journal entries
+                          type: string
+                        largeMessageTableName:
+                          description: The table name used to store large message files
+                          type: string
+                        pageStoreTableName:
+                          description: The table name used to store paging message files
+                          type: string
+                        nodeManagerStoreTableName:
+                          description: The table name used to hold shared store data
+                          type: string
+                        jdbcNetworkTimeout:
+                          description: The JDBC network connection timeout in milliseconds.
+                          type: integer
+                        jdbcLockRenewPeriod:
+                          description: The period in milliseconds of the keep alive service of a JDBC lock.
+                          type: integer
+                        jdbcLockExpiration:
+                          description: The time in milliseconds a JDBC lock is considered valid without keeping it alive.
+                          type: integer
+                        jdbcJournalSyncPeriod:
+                          description: The JDBC jouranl sync period in milliseconds.
+                          type: string
+                criticalAnalyzerPolicy:
+                  description: Should the server log, be shutdown or halted upon critical analysis failure.
+                  type: string
+                  enum:
+                  - "LOG"
+                  - "HALT"
+                  - "SHUTDOWN"
+                securitySettings:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:SecuritySettings"
+                  description: a list of security settings
+                  type: object
+                  properties:
+                    securitySetting:
+                      description: security setting configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:ConfigurationType:SecuritySettings:SecuritySetting"
+                        type: object
+                        properties:
+                          permission:
+                            description: a permission to add to the matched addresses
+                            type: array
+                            items:
+                              type: object
+                              #id: "urn:jsonschema:activemq:core:ConfigurationType:SecuritySettings:SecuritySetting:Permission"
+                              properties:
+                                type:
+                                  description: the type of permission
+                                  type: string
+                                roles:
+                                  description: a comma-separated list of roles to apply the permission to
+                                  type: string
+                          match:
+                            description: pattern for matching security roles against addresses; can use wildards
+                            type: string
+                    securitySettingPlugin:
+                      #id: "urn:jsonschema:activemq:core:ConfigurationType:SecuritySettings:SecuritySettingPlugin"
+                      description: a security setting plugin
+                      type: object
+                      properties:
+                        setting:
+                          description: plugin settings
+                          type: array
+                          items:
+                            #id: "urn:jsonschema:activemq:core:ConfigurationType:SecuritySettings:SecuritySettingPlugin:Setting"
+                            type: object
+                            properties:
+                              name:
+                                description: name of the setting
+                                type: string
+                              value:
+                                description: value of the setting
+                                type: string
+                        className:
+                          description: the name of the plugin class to instantiate
+                          type: string
+                    roleMapping:
+                      description: role mapping configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:ConfigurationType:SecuritySettings:RoleMapping"
+                        type: object
+                        properties:
+                          from:
+                            description: the name of the external role
+                            type: string
+                          to:
+                            description: the comma delimited name of the internal role(s)
+                            type: string
+                brokerPlugins:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:BrokerPlugins"
+                  description: a list of broker-plugins
+                  type: object
+                  properties:
+                    brokerPlugin:
+                      description: broker plugin configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:ConfigurationType:BrokerPlugins:BrokerPlugin"
+                        type: object
+                        properties:
+                          property:
+                            type: array
+                            items:
+                              type: object
+                              #$ref: "urn:jsonschema:activemq:core:Property"
+                              properties:
+                                key:
+                                  type: string
+                                value:
+                                  type: string
+                          className:
+                            description: the name of the broker plugin class to instantiate
+                            type: string
+                metricsPluginDeprecated:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:MetricsPluginDeprecated"
+                  description: DEPRECATED. use metrics instead. A metrics plugin
+                  type: object
+                  properties:
+                    property:
+                      type: array
+                      items:
+                        type: object
+                        #$ref: "urn:jsonschema:activemq:core:Property"
+                        properties:
+                          key:
+                            type: string
+                          value:
+                            type: string
+                    className:
+                      type: string
+                metrics:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:Metrics"
+                  description: metrics configuration
+                  type: object
+                  properties:
+                    jvmMemory:
+                      description: whether or not to report JVM memory metrics
+                      type: boolean
+                    jvmThreads:
+                      description: whether or not to report JVM thread metrics
+                      type: boolean
+                    jvmGc:
+                      description: whether or not to report JVM GC metrics
+                      type: boolean
+                    plugin:
+                      #id: "urn:jsonschema:activemq:core:ConfigurationType:Metrics:Plugin"
+                      description: a metrics plugin
+                      type: object
+                      properties:
+                        property:
+                          type: array
+                          items:
+                            #$ref: "urn:jsonschema:activemq:core:Property"
+                            type: object
+                            properties:
+                              key:
+                                type: string
+                              value:
+                                type: string
+                        className:
+                          description: the name of the metrics plugin class to instantiate
+                          type: string
+                addressSettings:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:AddressSettings"
+                  description: a list of address settings
+                  type: object
+                  properties:
+                    addressSetting:
+                      description: address setting configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:AddressSetting"
+                        type: object
+                        properties:
+                          deadLetterAddress:
+                            description: the address to send dead messages to
+                            type: string
+                          autoCreateDeadLetterResources:
+                            description: >-
+                              whether or not to automatically create the dead-letter-address and/or a corresponding queue
+                              on that address when a message found to be undeliverable
+                            type: boolean
+                          deadLetterQueuePrefix:
+                            description: the prefix to use for auto-created dead letter queues
+                            type: string
+                          deadLetterQueueSuffix:
+                            description: the suffix to use for auto-created dead letter queues
+                            type: string
+                          expiryAddress:
+                            description: the address to send expired messages to
+                            type: string
+                          autoCreateExpiryResources:
+                            description: >-
+                              whether or not to automatically create the expiry-address and/or a corresponding queue
+                              on that address when a message is sent to a matching queue
+                            type: boolean
+                          expiryQueuePrefix:
+                            description: the prefix to use for auto-created expiry queues
+                            type: string
+                          expiryQueueSuffix:
+                            description: the suffix to use for auto-created expiry queues
+                            type: string
+                          expiryDelay:
+                            description: >-
+                              Overrides the expiration time for messages using the default value for expiration time. "-1"
+                              disables this setting.
+                            type: integer
+                          minExpiryDelay:
+                            description: Overrides the expiration time for messages using a lower value. "-1" disables this setting.
+                            type: integer
+                          maxExpiryDelay:
+                            description: Overrides the expiration time for messages using a higher value. "-1" disables this setting.
+                            type: integer
+                          redeliveryDelay:
+                            description: the time (in ms) to wait before redelivering a cancelled message.
+                            type: integer
+                          redeliveryDelayMultiplier:
+                            description: multiplier to apply to the redelivery-delay
+                            type: number
+                          redeliveryCollisionAvoidanceFactor:
+                            description: factor by which to modify the redelivery delay slightly to avoid collisions
+                            type: number
+                          maxRedeliveryDelay:
+                            description: Maximum value for the redelivery-delay
+                            type: integer
+                          maxDeliveryAttempts:
+                            description: how many times to attempt to deliver a message before sending to dead letter address
+                            type: integer
+                          maxSizeBytes:
+                            description: >-
+                              the maximum size in bytes for an address. -1 means no limits. This is used in PAGING, BLOCK and
+                              FAIL policies. Supports byte notation like K, Mb, GB, etc.
+                            type: string
+                          maxSizeBytesRejectThreshold:
+                            description: >-
+                              used with the address full BLOCK policy, the maximum size in bytes an address can reach before
+                              messages start getting rejected. Works in combination with max-size-bytes for AMQP protocol only.
+                              Default = -1 (no limit).
+                            type: integer
+                          pageSizeBytes:
+                            description: >-
+                              The page size in bytes to use for an address. Supports byte notation like K, Mb,
+                              GB, etc.
+                            type: string
+                          pageMaxCacheSize:
+                            description: Number of paging files to cache in memory to avoid IO during paging navigation
+                            type: integer
+                          addressFullPolicy:
+                            description: what happens when an address where maxSizeBytes is specified becomes full
+                            type: string
+                            enum:
+                            - "DROP"
+                            - "FAIL"
+                            - "PAGE"
+                            - "BLOCK"
+                          messageCounterHistoryDayLimit:
+                            description: how many days to keep message counter history for this address
+                            type: integer
+                          lastValueQueue:
+                            description: This is deprecated please use default-last-value-queue instead.
+                            type: boolean
+                          defaultLastValueQueue:
+                            description: whether to treat the queues under the address as a last value queues by default
+                            type: boolean
+                          defaultLastValueKey:
+                            description: the property to use as the key for a last value queue by default
+                            type: string
+                          defaultNonDestructive:
+                            description: whether the queue should be non-destructive by default
+                            type: boolean
+                          defaultExclusiveQueue:
+                            description: whether to treat the queues under the address as exclusive queues by default
+                            type: boolean
+                          defaultGroupRebalance:
+                            description: whether to rebalance groups when a consumer is added
+                            type: boolean
+                          defaultGroupBuckets:
+                            description: number of buckets to use for grouping, -1 (default) is unlimited and uses the raw group, 0 disables message groups.
+                            type: integer
+                          defaultGroupFirstKey:
+                            description: key used to mark a message is first in a group for a consumer
+                            type: string
+                          defaultConsumersBeforeDispatch:
+                            description: the default number of consumers needed before dispatch can start for queues under the address.
+                            type: integer
+                          defaultDelayBeforeDispatch:
+                            description: >-
+                              the default delay (in milliseconds) to wait before dispatching if number of consumers before
+                              dispatch is not met for queues under the address.
+                            type: integer
+                          redistributionDelay:
+                            description: >-
+                              how long (in ms) to wait after the last consumer is closed on a queue before redistributing
+                              messages.
+                            type: integer
+                          sendToDlaOnNoRoute:
+                            description: >-
+                              if there are no queues matching this address, whether to forward message to DLA (if it exists for
+                              this address)
+                            type: boolean
+                          slowConsumerThreshold:
+                            description: >-
+                              The minimum rate of message consumption allowed before a consumer is considered "slow." Measured
+                              in messages-per-second.
+                            type: integer
+                          slowConsumerPolicy:
+                            description: what happens when a slow consumer is identified
+                            type: string
+                            enum:
+                            - "KILL"
+                            - "NOTIFY"
+                          slowConsumerCheckPeriod:
+                            description: How often to check for slow consumers on a particular queue. Measured in seconds.
+                            type: integer
+                          autoCreateJmsQueues:
+                            description: >-
+                              DEPRECATED. whether or not to automatically create JMS queues when a producer sends or a consumer connects to a
+                              queue
+                            type: boolean
+                          autoDeleteJmsQueues:
+                            description: DEPRECATED. whether or not to delete auto-created JMS queues when the queue has 0 consumers and 0 messages
+                            type: boolean
+                          autoCreateJmsTopics:
+                            description: >-
+                              DEPRECATED. whether or not to automatically create JMS topics when a producer sends or a consumer subscribes to
+                              a topic
+                            type: boolean
+                          autoDeleteJmsTopics:
+                            description: DEPRECATED. whether or not to delete auto-created JMS topics when the last subscription is closed
+                            type: boolean
+                          autoCreateQueues:
+                            description: >-
+                              whether or not to automatically create a queue when a client sends a message to or attempts to consume
+                              a message from a queue
+                            type: boolean
+                          autoDeleteQueues:
+                            description: whether or not to delete auto-created queues when the queue has 0 consumers and 0 messages
+                            type: boolean
+                          autoDeleteCreatedQueues:
+                            description: whether or not to delete created queues when the queue has 0 consumers and 0 messages
+                            type: boolean
+                          autoDeleteQueuesDelay:
+                            description: >-
+                              how long to wait (in milliseconds) before deleting auto-created queues after the queue has 0
+                              consumers.
+                            type: integer
+                          autoDeleteQueuesMessageCount:
+                            description: >-
+                              the message count the queue must be at or below before it can be evaluated 
+                              to be auto deleted, 0 waits until empty queue (default) and -1 disables this check.
+                            type: integer
+                          configDeleteQueues:
+                            description: >-
+                              What to do when a queue is no longer in broker.xml.
+                              OFF = will do nothing queues will remain,
+                              FORCE = delete queues even if messages remaining.
+                            type: string
+                            enum:
+                            - "OFF"
+                            - "FORCE"
+                          autoCreateAddresses:
+                            description: >-
+                              whether or not to automatically create addresses when a client sends a message to or attempts to
+                              consume a message from a queue mapped to an address that doesn't exist
+                            type: boolean
+                          autoDeleteAddresses:
+                            description: whether or not to delete auto-created addresses when it no longer has any queues
+                            type: boolean
+                          autoDeleteAddressesDelay:
+                            description: >-
+                              how long to wait (in milliseconds) before deleting auto-created addresses after they no longer
+                              have any queues
+                            type: integer
+                          configDeleteAddresses:
+                            description: >-
+                              What to do when an address is no longer in broker.xml.
+                              OFF = will do nothing addresses will remain,
+                              FORCE = delete address and its queues even if messages remaining.
+                            type: string
+                            enum:
+                            - "OFF"
+                            - "FORCE"
+                          managementBrowsePageSize:
+                            description: how many message a management resource can browse
+                            type: integer
+                          defaultPurgeOnNoConsumers:
+                            description: purge the contents of the queue once there are no consumers
+                            type: boolean
+                          defaultMaxConsumers:
+                            description: the maximum number of consumers allowed on this queue at any one time
+                            type: integer
+                          defaultQueueRoutingType:
+                            description: the routing-type used on auto-created queues
+                            type: string
+                            enum:
+                            - "ANYCAST"
+                            - "MULTICAST"
+                          defaultAddressRoutingType:
+                            description: the routing-type used on auto-created addresses
+                            type: string
+                            enum:
+                            - "ANYCAST"
+                            - "MULTICAST"
+                          defaultConsumerWindowSize:
+                            description: the default window size for a consumer
+                            type: integer
+                          defaultRingSize:
+                            description: >-
+                              the default ring-size value for any matching queue which doesn't have ring-size explicitly
+                              defined
+                            type: integer
+                          retroactiveMessageCount:
+                            description: the number of messages to preserve for future queues created on the matching address
+                            type: integer
+                          enableMetrics:
+                            description: whether or not to enable metrics for metrics plugins on the matching address
+                            type: boolean
+                          match:
+                            description: pattern for matching settings against addresses; can use wildards
+                            type: string
+                resourceLimitSettings:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:ResourceLimitSettings"
+                  description: a list of resource limit settings
+                  type: object
+                  properties:
+                    resourceLimitSetting:
+                      description: Complex type element to configure resource limits for a particular user.
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:ResourceLimitSetting"
+                        type: object
+                        properties:
+                          maxConnections:
+                            description: how many connections are allowed by the matched user (-1 means no limit, default is -1)
+                            type: integer
+                          maxQueues:
+                            description: how many queues can be created by the matched user (-1 means no limit, default is -1)
+                            type: integer
+                          match:
+                            description: the name of the user to whom the limits should be applied
+                            type: string
+                connectorServices:
+                  #id: "urn:jsonschema:activemq:core:ConfigurationType:ConnectorServices"
+                  description: connector service configuration
+                  type: object
+                  properties:
+                    connectorService:
+                      description: configuration of a connector service
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:ConnectorServiceType"
+                        type: object
+                        properties:
+                          factoryClass:
+                            description: Name of the factory class of the ConnectorService
+                            type: string
+                          param:
+                            description: parameters
+                            type: array
+                            items:
+                              #id: "urn:jsonschema:activemq:core:ParamType"
+                              type: object
+                              properties:
+                                key:
+                                  type: string
+                                value:
+                                  type: string
+                          name:
+                            description: name of the connector service
+                            type: string
+                addresses:
+                  #id: "urn:jsonschema:activemq:core:AddressesType"
+                  description: addresses configuration
+                  type: object
+                  properties:
+                    address:
+                      description: an address configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:core:AddressType"
+                        type: object
+                        properties:
+                          anycast:
+                            #id: "urn:jsonschema:activemq:core:AddressType:Anycast"
+                            description: a list of pre configured anycast queues to create
+                            type: object
+                            properties:
+                              queue:
+                                type: array
+                                items:
+                                  #id: "urn:jsonschema:activemq:core:QueueType"
+                                  type: object
+                                  properties:
+                                    filter:
+                                      #$ref: "urn:jsonschema:activemq:core:Filter"
+                                      description: the queue filter
+                                      type: object
+                                      properties:
+                                        string:
+                                          type: string
+                                    durable:
+                                      type: boolean
+                                    user:
+                                      type: string
+                                    name:
+                                      type: string
+                                    maxConsumers:
+                                      type: integer
+                                    purgeOnNoConsumers:
+                                      type: boolean
+                                    exclusive:
+                                      type: boolean
+                                    groupRebalance:
+                                      type: boolean
+                                    groupBuckets:
+                                      type: integer
+                                    groupFirstKey:
+                                      type: string
+                                    lastValue:
+                                      type: boolean
+                                    lastValueKey:
+                                      type: string
+                                    nonDestructive:
+                                      type: boolean
+                                    consumersBeforeDispatch:
+                                      type: integer
+                                    delayBeforeDispatch:
+                                      type: integer
+                                    ringSize:
+                                      type: integer
+                                    enabled:
+                                      type: boolean
+                          multicast:
+                            #id: "urn:jsonschema:activemq:core:AddressType:Multicast"
+                            description: multicast queues configuration.
+                            type: object
+                            properties:
+                              queue:
+                                type: array
+                                items:
+                                  #$ref: "urn:jsonschema:activemq:core:QueueType"
+                                  type: object
+                                  properties:
+                                    filter:
+                                      #$ref: "urn:jsonschema:activemq:core:Filter"
+                                      description: the queue filter
+                                      type: object
+                                      properties:
+                                        string:
+                                          type: string
+                                    durable:
+                                      type: boolean
+                                    user:
+                                      type: string
+                                    name:
+                                      type: string
+                                    maxConsumers:
+                                      type: integer
+                                    purgeOnNoConsumers:
+                                      type: boolean
+                                    exclusive:
+                                      type: boolean
+                                    groupRebalance:
+                                      type: boolean
+                                    groupBuckets:
+                                      type: integer
+                                    groupFirstKey:
+                                      type: string
+                                    lastValue:
+                                      type: boolean
+                                    lastValueKey:
+                                      type: string
+                                    nonDestructive:
+                                      type: boolean
+                                    consumersBeforeDispatch:
+                                      type: integer
+                                    delayBeforeDispatch:
+                                      type: integer
+                                    ringSize:
+                                      type: integer
+                                    enabled:
+                                      type: boolean
+                          name:
+                            description: address name
+                            type: string
+                wildcardAddresses:
+                  #id: "urn:jsonschema:activemq:core:WildcardType"
+                  description: parameters to configure wildcard address matching format
+                  type: object
+                  properties:
+                    enabled:
+                      description: deprecated please use routing-enabled.
+                      type: boolean
+                    routingEnabled:
+                      description: is wildcard addresses routing enabled.
+                      type: boolean
+                    delimiter:
+                      description: wildcard address parts delimiter. Default .
+                      type: string
+                    anyWords:
+                      description: wildcard address any words character. Default '#'
+                      type: string
+                    singleWord:
+                      description: wildcard address single word character. Default '*'
+                      type: string
+##### jms #####
+                jms:
+                  #id: "urn:jsonschema:activemq:jms:Jms"
+                  description: jms destinations
+                  type: object
+                  properties:
+                    jmxDomain:
+                      description: jmx domain name
+                      type: string
+                    queue:
+                      description: jms queue configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:jms:QueueType"
+                        type: object
+                        properties:
+                          selector:
+                            #id: "urn:jsonschema:activemq:jms:QueueType:Selector"
+                            description: jms queue filter
+                            type: object
+                            properties:
+                              string:
+                                description: the filter
+                                type: string
+                          durable:
+                            description: whether the queue is durable
+                            type: boolean
+                          name:
+                            description: the queue name
+                            type: string
+                    topic:
+                      description: jms topic configuration
+                      type: array
+                      items:
+                        #id: "urn:jsonschema:activemq:jms:TopicType"
+                        type: object
+                        properties:
+                          name:
+                            description: the topic name
+                            type: string
+##### logging #####
+                loggingProperties:
+                  description: logging
+                  type: object
+                  properties:
+                    loggers:
+                      description: list of logger names
+                      type: array
+                      items:
+                        type: string
+                    loggerLevel:
+                      description: logger level
+                      type: string
+                    loggerProperties:
+                      description: config for loggers
+                      type: array
+                      items:
+                        type: string
+                    handlers:
+                      description: config for log handlers
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            description: logger name
+                            type: string
+                          className:
+                            description: handler class
+                            type: string
+                          level:
+                            description: log level
+                            type: string
+                          formatter:
+                            description: the formatter name
+                            type: string
+                          properties:
+                            description: the handler properties
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key:
+                                  type: string
+                                value:
+                                  type: string
+                    formatters:
+                      description: list of formatters
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            description: name of the formatter
+                            type: string
+                          className:
+                            description: formatter class name
+                            type: string
+                          properties:
+                            description: formatter properties
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key:
+                                  type: string
+                                value:
+                                  type: string
+##### jmx-management #####
+                managementContext:
+                  description: Configure jmx console access
+                  type: object
+                  properties:
+                    connector:
+                      description: configuration of the connector
+                      type: object
+                      properties:
+                        connectorHost:
+                          description: connector's host name
+                          type: string
+                        connectorPort:
+                          description: connector's port
+                          type: integer
+                        rmiRegistryPort:
+                          description: RMI registry port
+                          type: integer
+                        jmxRealm:
+                          description: jmx realm
+                          type: string
+                        objectName:
+                          description: jmx object name
+                          type: string
+                        authenticatorType:
+                          description: type of authenticator
+                          type: string
+                        secured:
+                          description: if access is secured
+                          type: boolean
+                        keyStoreProvider:
+                          description: key store provider
+                          type: string
+                        keyStorePath:
+                          description: key store path
+                          type: string
+                        keyStorePassword:
+                          description: key store password
+                          type: string
+                        trustStoreProvider:
+                          description: trust store provider
+                          type: string
+                        trustStorePath:
+                          description: trust store path
+                          type: string
+                        trustStorePassword:
+                          description: trust store password
+                          type: string
+                        passwordCodec:
+                          description: password encoder used to handle masked passwords
+                          type: string
+                    authorisation:
+                      description: authorisation list
+                      type: object
+                      properties:
+                        whitelist:
+                          description: whitelist
+                          type: object
+                          properties:
+                            entry:
+                              description: whitelist entries
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  domain:
+                                    description: the domain
+                                    type: string
+                                  key:
+                                    description: the key
+                                    type: string
+                        defaultAccess:
+                          description: default access list
+                          type: object
+                          properties:
+                            access:
+                              description: access configuration
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  method:
+                                    description: access method
+                                    type: string
+                                  role:
+                                    description: role name
+                                    type: string
+                        roleAccess:
+                          description: role-based access list
+                          type: object
+                          properties:
+                            match:
+                              description: list of matches
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  domain:
+                                    description: the domain name
+                                    type: string
+                                  key:
+                                    description: the key
+                                    type: string
+                                  access:
+                                    description: access rule
+                                    type: object
+                                    properties:
+                                      method:
+                                        description: the method
+                                        type: string
+                                      roles:
+                                        description: role names
+                                        type: string
+##### login.config #####
+                loginConfig:
+                  description: jaas login modules configuration
+                  type: object
+                  properties:
+                    entries:
+                      description: list of configuration
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            description: entry name
+                            type: string
+                          moduleConfig:
+                            description: module and options
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                className:
+                                  description: module class name
+                                  type: string
+                                flag:
+                                  description: module flag
+                                  type: string
+                                properties:
+                                  description: options
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      key:
+                                        type: string
+                                      value:
+                                        type: string
+##### jolokia.access #####
+                jolokiaAccess:
+                  description: jolokia access rules
+                  type: object
+                  properties:
+                    allowOrigins:
+                      type: array
+                      items:
+                        type: string
+                    strictChecking:
+                      type: boolean
+##### bootstrap #####
+                bootstrap:
+                  description: bootstrap configuration
+                  type: object
+                  properties:
+                    jaasSecurity:
+                      description: security setting
+                      type: object
+                      properties:
+                        domain:
+                          description: security domain name
+                          type: string
+                        certificateDomain:
+                          description: certificate domain
+                          type: string
+                    serverConfiguration:
+                      description: server configuration path
+                      type: string
+                    web:
+                      description: web configuration
+                      type: object
+                      properties:
+                        bind:
+                          description: bind address
+                          type: string
+                        path:
+                          description: web root path
+                          type: string
+                        apps:
+                          description: web applications
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              url:
+                                description: the url of application
+                                type: string
+                              war:
+                                description: the war name for the application
+                                type: string
+##### artemis.profile #####
+                artemisProfile:
+                  description: artemis profile configuration
+                  type: object
+                  properties:
+                    home:
+                      description: artemis home path
+                      type: string
+                    instance:
+                      description: artemis instance path
+                      type: string
+                    dataDir:
+                      description: data dir
+                      type: string
+                    instanceUri:
+                      description: artemis instance uri string
+                      type: string
+                    javaArgs:
+                      description: jvm args passed to broker
+                      type: array
+                      items:
+                        type: string
+                    javaArgsRun:
+                      description: system properties passed to artemis
+                      type: array
+                      items:
+                        type: string
+##### file based roles #####
+                artemisRoles:
+                  description: role definitions
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      roleName:
+                        type: string
+                      users:
+                        description: comma separated user names
+                        type: string
+##### file based users #####
+                artemisUsers:
+                  description: user credentials
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        description: user name
+                        type: string
+                      password:
+                        description: password
+                        type: string
+################
                 console:
                   description: Configuration for the embedded web console
                   type: object

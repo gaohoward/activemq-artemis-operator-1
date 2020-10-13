@@ -3,6 +3,7 @@ package v2alpha2activemqartemis
 import (
 	"fmt"
 	brokerv2alpha1 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v2alpha2"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/environments"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/services"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	routev1 "github.com/openshift/api/route/v1"
@@ -69,6 +70,12 @@ func TestActiveMQArtemisController_Reconcile(t *testing.T) {
 		},
 	}
 	r := buildReconcileWithFakeClientWithMocks(objs, t)
+
+	var err error = nil
+	isOpenshift := false
+	if isOpenshift, err = environments.DetectOpenshift(); err != nil {
+		log.Error(err, "Failed to get env, will try kubernetes")
+	}
 
 	res, err := r.Reconcile(request)
 	assert.NoError(t, err, "reconcile Error ")
@@ -156,11 +163,13 @@ func TestActiveMQArtemisController_Reconcile(t *testing.T) {
 							require.NoError(t, err)
 						}
 					})
-					t.Run("console Route "+ordinalString, func(t *testing.T) {
-						consoleRoute := types.NamespacedName{Name: AMQinstance.Name + "-wconsj" + "-" + ordinalString + "-svc-rte", Namespace: AMQinstance.Namespace}
-						err = r.client.Get(context.TODO(), consoleRoute, route)
-						require.NoError(t, err)
-					})
+					if isOpenshift {
+						t.Run("console Route "+ordinalString, func(t *testing.T) {
+							consoleRoute := types.NamespacedName{Name: AMQinstance.Name + "-wconsj" + "-" + ordinalString + "-svc-rte", Namespace: AMQinstance.Namespace}
+							err = r.client.Get(context.TODO(), consoleRoute, route)
+							require.NoError(t, err)
+						})
+					}
 				})
 			}
 		})

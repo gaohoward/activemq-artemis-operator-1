@@ -3,12 +3,15 @@ package cr2jinja2
 import (
 	v2alpha3 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v2alpha3"
 	v2alpha4 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v2alpha4"
+	v2alpha5 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v2alpha5"
 
 	//k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 //the following values in string type will be parsed as bool values
@@ -41,13 +44,36 @@ var specialsMap map[string]bool = map[string]bool{
 	"OFF":   true,
 }
 
+func isSpecialValue(value string) bool {
+	if specialsMap[value] {
+		return true
+	}
+	if strings.Contains(value, "%") {
+		return true
+	}
+	if strings.Contains(value, "$") {
+		return true
+	}
+	return false
+}
+
+func getUUID() *string {
+	id := uuid.New()
+	result := id.String()
+	return &result
+}
+
 //Used to check properties that has a special values
 //which may be misinterpreted by yacfg.
-func checkStringSpecial(prop *string, propname string, match string, specials map[string]string) *string {
+//so we use a uuid as uniquekey and in the mean time as prop
+func checkStringSpecial(prop *string, specials map[string]string) *string {
 	if nil == prop {
 		return nil
-	} else if specialsMap[*prop] {
-		specials[match+propname] = *prop
+	} else if isSpecialValue(*prop) {
+		fmt.Println("mmmm the value is a special: " + *prop)
+		uniqueKey := getUUID()
+		specials[*uniqueKey] = *prop
+		return uniqueKey
 	}
 	return prop
 }
@@ -84,6 +110,112 @@ func checkFloat32(prop *float32) *string {
 	return &tmp
 }
 
+func MakeLoggingCfgOverrides(customResource *v2alpha5.ActiveMQArtemis) (string, map[string]string) {
+	var sb, sbroot strings.Builder
+	var specials map[string]string = make(map[string]string)
+
+	loggers := customResource.Spec.Logging.Logger
+	var hasRoot bool = false
+	var loggingHead bool = false
+
+	if len(loggers) > 0 {
+		var loggersHead bool = false
+		for _, logger := range loggers {
+			if logger.Name == "" {
+				//root logger
+				if value := checkStringSpecial(logger.Level, specials); value != nil {
+					sbroot.WriteString("log_level_root: " + *value + "\n")
+					hasRoot = true
+				}
+				if value := checkStringSpecial(logger.Handlers, specials); value != nil {
+					sbroot.WriteString("log_handlers_root: " + *value + "\n")
+					hasRoot = true
+				}
+			} else {
+				//normal logger
+				if !loggingHead {
+					sb.WriteString("logging:" + "\n")
+					loggingHead = true
+				}
+				if !loggersHead {
+					sb.WriteString("  loggers:\n")
+					loggersHead = true
+				}
+				sb.WriteString("  - name: " + logger.Name + "\n")
+				if value := checkStringSpecial(logger.Level, specials); value != nil {
+					sb.WriteString("    level: " + *value + "\n")
+				}
+				if value := checkStringSpecial(logger.Handlers, specials); value != nil {
+					sb.WriteString("    handlers: " + *value + "\n")
+				}
+				if value := checkBool(logger.UseParentHandlers); value != nil {
+					sb.WriteString("    useParentHandlers: " + *value + "\n")
+				}
+			}
+		}
+	}
+	//handlers
+	handlers := customResource.Spec.Logging.Handler
+	if len(handlers) > 0 {
+		if !loggingHead {
+			sb.WriteString("logging:" + "\n")
+			loggingHead = true
+		}
+		sb.WriteString("  handlers: \n")
+		for _, handler := range handlers {
+			sb.WriteString("  - name: " + handler.Name + "\n")
+			if value := checkStringSpecial(handler.ClassName, specials); value != nil {
+				sb.WriteString("    className: " + *value + "\n")
+			}
+			if len(handler.Properties) > 0 {
+				sb.WriteString("    properties:\n")
+				for _, prop := range handler.Properties {
+					if k := checkStringSpecial(topointer(prop.Name), specials); k != nil {
+						sb.WriteString("    - key: " + *k + "\n")
+					}
+					if v := checkStringSpecial(topointer(prop.Value), specials); v != nil {
+						sb.WriteString("      value: " + *v + "\n")
+					}
+				}
+			}
+		}
+	}
+	//formatters
+	formatters := customResource.Spec.Logging.Formatter
+	if len(formatters) > 0 {
+		if !loggingHead {
+			sb.WriteString("logging:" + "\n")
+			loggingHead = true
+		}
+		sb.WriteString("  formatters: \n")
+		for _, formatter := range formatters {
+			if value := checkStringSpecial(topointer(formatter.Name), specials); value != nil {
+				sb.WriteString("  - name: " + *value + "\n")
+			}
+			if value := checkStringSpecial(formatter.ClassName, specials); value != nil {
+				sb.WriteString("    className: " + *value + "\n")
+			}
+			if len(formatter.Properties) > 0 {
+				sb.WriteString("    properties:\n")
+				for _, prop := range formatter.Properties {
+					if k := checkStringSpecial(topointer(prop.Name), specials); k != nil {
+						sb.WriteString("    - key: " + *k + "\n")
+					}
+					if v := checkStringSpecial(topointer(prop.Value), specials); v != nil {
+						sb.WriteString("      value: " + *v + "\n")
+					}
+				}
+			}
+		}
+	}
+
+	if hasRoot {
+		sb.WriteString("\n")
+		sb.WriteString(sbroot.String())
+	}
+	return sb.String(), specials
+}
+
 /* return a yaml string and a map of special values that need to pass to yacfg */
 func MakeBrokerCfgOverrides(customResource interface{}, envVar *string, output *string) (string, map[string]string) {
 
@@ -100,6 +232,12 @@ func MakeBrokerCfgOverrides(customResource interface{}, envVar *string, output *
 		if ok {
 			MakeBrokerCfgOverridesForV2alpha4(v2alpha4Res, envVar, output, &sb, specials)
 			processed = true
+		} else {
+			v2alpha5Res, ok := customResource.(*v2alpha5.ActiveMQArtemis)
+			if ok {
+				MakeBrokerCfgOverridesForV2alpha5(v2alpha5Res, envVar, output, &sb, specials)
+				processed = true
+			}
 		}
 	}
 
@@ -123,6 +261,18 @@ func MakeBrokerCfgOverrides(customResource interface{}, envVar *string, output *
 	return result, specials
 }
 
+func MakeBrokerCfgOverridesForV2alpha5(customResource *v2alpha5.ActiveMQArtemis, envVar *string, output *string, sb *strings.Builder, specials map[string]string) {
+	var addressSettings *[]v2alpha5.AddressSettingType = &customResource.Spec.AddressSettings.AddressSetting
+
+	//because the address settings are same between v2alpha3 and v2alpha5, reuse the code
+	var addressSettingsV2alpha3 []v2alpha3.AddressSettingType
+	for _, a := range *addressSettings {
+		addressSettingsV2alpha3 = append(addressSettingsV2alpha3, v2alpha3.AddressSettingType(a))
+	}
+
+	processAddressSettings(sb, &addressSettingsV2alpha3, specials)
+}
+
 func MakeBrokerCfgOverridesForV2alpha4(customResource *v2alpha4.ActiveMQArtemis, envVar *string, output *string, sb *strings.Builder, specials map[string]string) {
 	var addressSettings *[]v2alpha4.AddressSettingType = &customResource.Spec.AddressSettings.AddressSetting
 
@@ -143,6 +293,11 @@ func MakeBrokerCfgOverridesForV2alpha3(customResource *v2alpha3.ActiveMQArtemis,
 
 }
 
+func topointer(value string) *string {
+	result := value
+	return &result
+}
+
 func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.AddressSettingType, specials map[string]string) {
 
 	if addressSettings == nil || len(*addressSettings) == 0 {
@@ -155,28 +310,28 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 			matchValue = "'#'"
 		}
 		sb.WriteString("- match: " + matchValue + "\n")
-		if value := checkStringSpecial(s.DeadLetterAddress, "dead_letter_address", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DeadLetterAddress, specials); value != nil {
 			sb.WriteString("  dead_letter_address: " + *value + "\n")
 		}
 		if value := checkBool(s.AutoCreateDeadLetterResources); value != nil {
 			sb.WriteString("  auto_create_dead_letter_resources: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.DeadLetterQueuePrefix, "dead_letter_queue_prefix", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DeadLetterQueuePrefix, specials); value != nil {
 			sb.WriteString("  dead_letter_queue_prefix: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.DeadLetterQueueSuffix, "dead_letter_queue_suffix", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DeadLetterQueueSuffix, specials); value != nil {
 			sb.WriteString("  dead_letter_queue_suffix: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.ExpiryAddress, "expiry_address", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.ExpiryAddress, specials); value != nil {
 			sb.WriteString("  expiry_address: " + *value + "\n")
 		}
 		if value := checkBool(s.AutoCreateExpiryResources); value != nil {
 			sb.WriteString("  auto_create_expiry_resources: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.ExpiryQueuePrefix, "expiry_queue_prefix", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.ExpiryQueuePrefix, specials); value != nil {
 			sb.WriteString("  expiry_queue_prefix: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.ExpiryQueueSuffix, "expiry_queue_suffix", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.ExpiryQueueSuffix, specials); value != nil {
 			sb.WriteString("  expiry_queue_suffix: " + *value + "\n")
 		}
 		if value := checkInt32(s.ExpiryDelay); value != nil {
@@ -203,19 +358,19 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkInt32(s.MaxDeliveryAttempts); value != nil {
 			sb.WriteString("  max_delivery_attempts: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.MaxSizeBytes, "max_size_bytes", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.MaxSizeBytes, specials); value != nil {
 			sb.WriteString("  max_size_bytes: " + *value + "\n")
 		}
 		if value := checkInt32(s.MaxSizeBytesRejectThreshold); value != nil {
 			sb.WriteString("  max_size_bytes_reject_threshold: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.PageSizeBytes, "page_size_bytes", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.PageSizeBytes, specials); value != nil {
 			sb.WriteString("  page_size_bytes: " + *value + "\n")
 		}
 		if value := checkInt32(s.PageMaxCacheSize); value != nil {
 			sb.WriteString("  page_max_cache_size: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.AddressFullPolicy, "address_full_policy", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.AddressFullPolicy, specials); value != nil {
 			sb.WriteString("  address_full_policy: " + *value + "\n")
 		}
 		if value := checkInt32(s.MessageCounterHistoryDayLimit); value != nil {
@@ -227,7 +382,7 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkBool(s.DefaultLastValueQueue); value != nil {
 			sb.WriteString("  default_last_value_queue: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.DefaultLastValueKey, "default_last_value_key", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DefaultLastValueKey, specials); value != nil {
 			sb.WriteString("  default_last_value_key: " + *value + "\n")
 		}
 		if value := checkBool(s.DefaultNonDestructive); value != nil {
@@ -245,7 +400,7 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkInt32(s.DefaultGroupBuckets); value != nil {
 			sb.WriteString("  default_group_buckets: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.DefaultGroupFirstKey, "default_group_first_key", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DefaultGroupFirstKey, specials); value != nil {
 			sb.WriteString("  default_group_first_key: " + *value + "\n")
 		}
 		if value := checkInt32(s.DefaultConsumersBeforeDispatch); value != nil {
@@ -263,7 +418,7 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkInt32(s.SlowConsumerThreshold); value != nil {
 			sb.WriteString("  slow_consumer_threshold: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.SlowConsumerPolicy, "slow_consumer_policy", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.SlowConsumerPolicy, specials); value != nil {
 			sb.WriteString("  slow_consumer_policy: " + *value + "\n")
 		}
 		if value := checkInt32(s.SlowConsumerCheckPeriod); value != nil {
@@ -296,7 +451,7 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkInt32(s.AutoDeleteQueuesMessageCount); value != nil {
 			sb.WriteString("  auto_delete_queues_message_count: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.ConfigDeleteQueues, "config_delete_queues", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.ConfigDeleteQueues, specials); value != nil {
 			sb.WriteString("  config_delete_queues: " + *value + "\n")
 		}
 		if value := checkBool(s.AutoCreateAddresses); value != nil {
@@ -308,7 +463,7 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkInt32(s.AutoDeleteAddressesDelay); value != nil {
 			sb.WriteString("  auto_delete_addresses_delay: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.ConfigDeleteAddresses, "config_delete_addresses", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.ConfigDeleteAddresses, specials); value != nil {
 			sb.WriteString("  config_delete_addresses: " + *value + "\n")
 		}
 		if value := checkInt32(s.ManagementBrowsePageSize); value != nil {
@@ -320,10 +475,10 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 		if value := checkInt32(s.DefaultMaxConsumers); value != nil {
 			sb.WriteString("  default_max_consumers: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.DefaultQueueRoutingType, "default_queue_routing_type", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DefaultQueueRoutingType, specials); value != nil {
 			sb.WriteString("  default_queue_routing_type: " + *value + "\n")
 		}
-		if value := checkStringSpecial(s.DefaultAddressRoutingType, "default_address_routing_type", matchValue, specials); value != nil {
+		if value := checkStringSpecial(s.DefaultAddressRoutingType, specials); value != nil {
 			sb.WriteString("  default_address_routing_type: " + *value + "\n")
 		}
 		if value := checkInt32(s.DefaultConsumerWindowSize); value != nil {

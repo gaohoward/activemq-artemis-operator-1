@@ -1,0 +1,30 @@
+apiVersion: broker.amq.io/v2alpha5
+kind: ActiveMQArtemis
+metadata:
+  name: ex-aao
+spec:
+  deploymentPlan:
+    size: 1
+    image: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:0.2.0
+  logging:
+    loggers:
+    - name: ''
+      level: DEBUG
+      handlers: FILE
+    - name: org.apache.activemq.artemis.core.server
+      level: DEBUG
+      handlers: FILE
+      useParentHandlers: false
+    handlers:
+    - name: FILE
+      properties:
+      - name: level
+        value: TRACE
+      - name: formatter
+        value: PATTERN3
+    formatters:
+    - name: PATTERN3
+      className: org.jboss.logmanager.formatters.PatternFormatter
+      properties:
+      - name: pattern
+        value: '%d (pattern3) %-5p [%c](%t) %s%E%n'

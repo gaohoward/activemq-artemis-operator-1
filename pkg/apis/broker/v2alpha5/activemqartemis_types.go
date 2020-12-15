@@ -136,6 +136,19 @@ type DeploymentPlanType struct {
 	Storage               StorageType                 `json:"storage,omitempty"`
 	JolokiaAgentEnabled   bool                        `json:"jolokiaAgentEnabled,omitempty"`
 	ManagementRBACEnabled bool                        `json:"managementRBACEnabled,omitempty"`
+	CustomInitImage       CustomInitImageType         `json:"customInitImage,omitempty"`
+}
+
+type CustomInitImageType struct {
+	BrokerCfgDir        *string                 `json:"brokerCfgDir,omitempty"`
+	BrokerExtraLibDir   *string                 `json:"brokerExtraLibDir,omitempty"`
+	BrokerInstallScript BrokerInstallScriptType `json:"brokerInstallScript,omitempty"`
+	ImageSpec           []corev1.Container      `json:"imageSpec,omitempty"`
+}
+
+type BrokerInstallScriptType struct {
+	Name *string `json:"name,omitempty"`
+	Path *string `json:"path,omitempty"`
 }
 
 type StorageType struct {

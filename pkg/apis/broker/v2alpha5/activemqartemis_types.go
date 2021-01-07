@@ -140,15 +140,9 @@ type DeploymentPlanType struct {
 }
 
 type CustomInitImageType struct {
-	BrokerCfgDir        *string                 `json:"brokerCfgDir,omitempty"`
-	BrokerExtraLibDir   *string                 `json:"brokerExtraLibDir,omitempty"`
-	BrokerInstallScript BrokerInstallScriptType `json:"brokerInstallScript,omitempty"`
-	ImageSpec           []corev1.Container      `json:"imageSpec,omitempty"`
-}
-
-type BrokerInstallScriptType struct {
-	Name *string `json:"name,omitempty"`
-	Path *string `json:"path,omitempty"`
+	BrokerCfgRootDir    *string           `json:"brokerCfgRootDir,omitempty"`
+	BrokerInstallScript *string           `json:"brokerInstallScript,omitempty"`
+	ImageSpec           *corev1.Container `json:"imageSpec,omitempty"`
 }
 
 type StorageType struct {

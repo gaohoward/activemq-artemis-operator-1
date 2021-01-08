@@ -47,6 +47,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	goerr "errors"
 	"strconv"
 	"strings"
 
@@ -1396,6 +1397,7 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 		newCustomResource = cr
 		cachedCustomResource = cr
 	}
+
 	// Log where we are and what we're doing
 	reqLogger := log.WithName(newCustomResource.Name)
 	reqLogger.V(1).Info("NewPodTemplateSpecForCR - v2alpha5")
@@ -1444,13 +1446,7 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 	}
 	environments.Create(Spec.Containers, &envConfigBroker)
 
-	//tell container we have custom images
-	envBrokerCustomImageFlag := corev1.EnvVar{
-		Name:  "BROKER_INIT_IMAGE_EXIST",
-		Value: "true",
-	}
-	environments.Create(Spec.Containers, &envBrokerCustomImageFlag)
-
+	//tell container where to get the configuration
 	brokerCfgRoot = newCustomResource.Spec.DeploymentPlan.CustomInitImage.BrokerCfgRootDir
 	if brokerCfgRoot == nil {
 		brokerCfgRoot = &defaultBrokerCfgRoot
@@ -1469,7 +1465,7 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 	volumeMountForCfg := volumes.MakeVolumeMountForCfg(cfgVolumeName, *brokerCfgRoot)
 	Spec.Containers[0].VolumeMounts = append(Spec.Containers[0].VolumeMounts, volumeMountForCfg)
 
-	log.Info("Now the init container should always been present.")
+	log.Info("Creating init container for broker configuration")
 	initContainer := containers.MakeInitContainer("", "", MakeEnvVarArrayForCR(newCustomResource))
 
 	customInitUsed := newCustomResource.Spec.DeploymentPlan.CustomInitImage.ImageSpec
@@ -1481,36 +1477,44 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 	//inits. Custom init must built with internal init as base image.
 
 	if customInitUsed != nil {
-		log.Info("mmmm User init specified use it")
+		log.Info("Custome image is provided")
 		//check script config
 		if newCustomResource.Spec.DeploymentPlan.CustomInitImage.BrokerInstallScript != nil {
 			customScriptName = newCustomResource.Spec.DeploymentPlan.CustomInitImage.BrokerInstallScript
 		} else {
-			log.Info("*** No custom script specified")
+			log.Error(goerr.New("No custom script specified"), "No custom script")
 		}
 	}
 	//resolve initImage
 	initImage := "quay.io/artemiscloud/activemq-artemis-broker-init:0.2"
-	if customInitUsed != nil {
+	if customInitUsed != nil && customInitUsed.Image != "" {
 		initImage = customInitUsed.Image
-		log.Info("mmmm Using user custom init image: ", "url", initImage)
 	} else {
 		if len(newCustomResource.Spec.DeploymentPlan.InitImage) > 0 {
 			initImage = newCustomResource.Spec.DeploymentPlan.InitImage
-			log.Info("Using customized init image", "url", initImage)
-			log.Info("mmmm initImage specified, use it", "url", initImage)
+			log.Info("Get init Image from DeploymentPlan.InitImage", "url", initImage)
+		} else if customInitUsed != nil {
+			log.Error(goerr.New("No custom init Image available!"), "No custom init image found")
 		}
 	}
 
+	log.Info("Resolved init Image", "URL", initImage)
+
 	var initImgName string
-	if customInitUsed != nil {
+	if customInitUsed != nil && customInitUsed.Name != "" {
 		initImgName = customInitUsed.Name
 	} else {
 		initImgName = "amq-broker-init"
 	}
 
+	var pullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
+	if customInitUsed != nil && customInitUsed.ImagePullPolicy != ("") {
+		pullPolicy = customInitUsed.ImagePullPolicy
+	}
+
 	initContainer.Name = initImgName
 	initContainer.Image = initImage
+	initContainer.ImagePullPolicy = pullPolicy
 	initContainer.Command = []string{"/bin/bash"}
 	initContainer.Resources = newCustomResource.Spec.DeploymentPlan.Resources
 
@@ -1620,23 +1624,6 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 		}
 		environments.Create(Spec.InitContainers, &tuneFile)
 
-		dontConfig := corev1.EnvVar{
-			Name:  "CONFIG_BROKER",
-			Value: "true",
-		}
-		environments.Create(Spec.InitContainers, &dontConfig)
-		dontRun := corev1.EnvVar{
-			Name:  "RUN_BROKER",
-			Value: "false",
-		}
-		environments.Create(Spec.InitContainers, &dontRun)
-
-		envBrokerCustomInstanceDir := corev1.EnvVar{
-			Name:  "CONFIG_INSTANCE_DIR",
-			Value: *brokerCfgRoot,
-		}
-		environments.Create(Spec.InitContainers, &envBrokerCustomInstanceDir)
-
 		//now make volumes mount available to init image
 		log.Info("mmm making volume mounts")
 
@@ -1669,12 +1656,27 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 		} else {
 			initArgs = []string{"-c", configCmd}
 		}
+		initContainer.Args = initArgs
 
-		Spec.InitContainers[0].Args = initArgs
+		Spec.InitContainers = []corev1.Container{
+			initContainer,
+		}
 
 		volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, *brokerCfgRoot)
 		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
 	}
+
+	dontRun := corev1.EnvVar{
+		Name:  "RUN_BROKER",
+		Value: "false",
+	}
+	environments.Create(Spec.InitContainers, &dontRun)
+
+	envBrokerCustomInstanceDir = corev1.EnvVar{
+		Name:  "CONFIG_INSTANCE_DIR",
+		Value: *brokerCfgRoot,
+	}
+	environments.Create(Spec.InitContainers, &envBrokerCustomInstanceDir)
 
 	log.Info("Final Init spec (always)", "Detail", Spec.InitContainers)
 

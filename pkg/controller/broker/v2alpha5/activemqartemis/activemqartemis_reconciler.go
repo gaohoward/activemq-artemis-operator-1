@@ -47,6 +47,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	goerr "errors"
 	"strconv"
 	"strings"
 
@@ -71,6 +72,10 @@ const (
 var defaultMessageMigration bool = true
 var requestedResources []resource.KubernetesResource
 var lastStatus olm.DeploymentStatus
+
+var defaultBrokerScriptDir string = "/custom_bin"
+var defaultBrokerCfgRoot string = "/broker_cfg_root"
+var defaultBrokerConfigScript = "/opt/amq-broker/script/default.sh"
 
 //default ApplyRule for address-settings
 var defApplyRule string = "merge_all"
@@ -397,6 +402,15 @@ func sourceEnvVarFromSecret(customResource *brokerv2alpha5.ActiveMQArtemis, curr
 			retVal = statefulSetAcceptorsUpdated
 		} else {
 			log.V(1).Info("sourceEnvVarFromSecret retrieved " + envVarName)
+		}
+		//custom init container
+		if len(currentStatefulSet.Spec.Template.Spec.InitContainers) > 0 {
+			log.Info("----we have custom init-containers")
+			if retrievedEnvVar := environments.Retrieve(currentStatefulSet.Spec.Template.Spec.InitContainers, envVarName); nil == retrievedEnvVar {
+				environments.Create(currentStatefulSet.Spec.Template.Spec.InitContainers, envVarDefinition)
+			} else {
+				log.V(1).Info("sourceEnvVarFromSecret retrieved for init container" + envVarName)
+			}
 		}
 	}
 
@@ -1384,6 +1398,7 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 		newCustomResource = cr
 		cachedCustomResource = cr
 	}
+
 	// Log where we are and what we're doing
 	reqLogger := log.WithName(newCustomResource.Name)
 	reqLogger.V(1).Info("NewPodTemplateSpecForCR - v2alpha5")
@@ -1422,6 +1437,92 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 	}
 	Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 
+	var brokerCfgRoot *string = nil
+	var cfgVolumeName string = "amq-cfg-dir"
+
+	//tell container don't config
+	envConfigBroker := corev1.EnvVar{
+		Name:  "CONFIG_BROKER",
+		Value: "false",
+	}
+	environments.Create(Spec.Containers, &envConfigBroker)
+
+	//tell container where to get the configuration
+	brokerCfgRoot = newCustomResource.Spec.DeploymentPlan.CustomInitImage.BrokerCfgRootDir
+	if brokerCfgRoot == nil {
+		brokerCfgRoot = &defaultBrokerCfgRoot
+	}
+
+	envBrokerCustomInstanceDir := corev1.EnvVar{
+		Name:  "CONFIG_INSTANCE_DIR",
+		Value: *brokerCfgRoot,
+	}
+	environments.Create(Spec.Containers, &envBrokerCustomInstanceDir)
+
+	//add empty-dir volume and volumeMounts to main container
+	volumeForCfg := volumes.MakeVolumeForCfg(cfgVolumeName)
+	Spec.Volumes = append(Spec.Volumes, volumeForCfg)
+
+	volumeMountForCfg := volumes.MakeVolumeMountForCfg(cfgVolumeName, *brokerCfgRoot)
+	Spec.Containers[0].VolumeMounts = append(Spec.Containers[0].VolumeMounts, volumeMountForCfg)
+
+	log.Info("Creating init container for broker configuration")
+	initContainer := containers.MakeInitContainer("", "", MakeEnvVarArrayForCR(newCustomResource))
+
+	customInitUsed := newCustomResource.Spec.DeploymentPlan.CustomInitImage.ImageSpec
+	var customScriptName *string = nil
+
+	//if custom init images present, don't use internal init image
+	//instead use custom image
+	//do normal internal init image stuff, then pass control to custom
+	//inits. Custom init must built with internal init as base image.
+
+	if customInitUsed != nil {
+		log.Info("Custome image is provided")
+		//check config script
+		if newCustomResource.Spec.DeploymentPlan.CustomInitImage.BrokerInstallScript != nil {
+			customScriptName = newCustomResource.Spec.DeploymentPlan.CustomInitImage.BrokerInstallScript
+		} else {
+			log.Info("No custom script specified, use default")
+			customScriptName = &defaultBrokerConfigScript
+		}
+	} else {
+		log.Info("Installing default script")
+		customScriptName = &defaultBrokerConfigScript
+	}
+	//resolve initImage
+	initImage := "quay.io/artemiscloud/activemq-artemis-broker-init:0.2"
+	if customInitUsed != nil && customInitUsed.Image != "" {
+		initImage = customInitUsed.Image
+	} else {
+		if len(newCustomResource.Spec.DeploymentPlan.InitImage) > 0 {
+			initImage = newCustomResource.Spec.DeploymentPlan.InitImage
+			log.Info("Get init Image from DeploymentPlan.InitImage", "url", initImage)
+		} else if customInitUsed != nil {
+			log.Error(goerr.New("No custom init Image available!"), "No custom init image found")
+		}
+	}
+
+	log.Info("Resolved init Image", "URL", initImage)
+
+	var initImgName string
+	if customInitUsed != nil && customInitUsed.Name != "" {
+		initImgName = customInitUsed.Name
+	} else {
+		initImgName = "amq-broker-init"
+	}
+
+	var pullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
+	if customInitUsed != nil && customInitUsed.ImagePullPolicy != ("") {
+		pullPolicy = customInitUsed.ImagePullPolicy
+	}
+
+	initContainer.Name = initImgName
+	initContainer.Image = initImage
+	initContainer.ImagePullPolicy = pullPolicy
+	initContainer.Command = []string{"/bin/bash"}
+	initContainer.Resources = newCustomResource.Spec.DeploymentPlan.Resources
+
 	//address settings
 	addressSettings := newCustomResource.Spec.AddressSettings.AddressSetting
 	//logging settings using cached one
@@ -1429,28 +1530,15 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 
 	if len(addressSettings) > 0 || len(loggingSettings.Logger) > 0 || len(loggingSettings.Handler) > 0 || len(loggingSettings.Formatter) > 0 {
 		reqLogger.Info("customize configuration detected, exposing tune-path first")
-		envVarTuneFilePath := "TUNE_PATH"
-		outputDir := "/yacfg_etc"
-
-		//pass cfg file location and apply rule to main container via env vars
-		tuneFile := corev1.EnvVar{
-			Name:  envVarTuneFilePath,
-			Value: outputDir,
-		}
-		environments.Create(Spec.Containers, &tuneFile)
+		log.Info("mmmm processing address-settings and logging")
 
 		var configYaml strings.Builder
 		var configSpecials map[string]string = make(map[string]string)
 
-		if len(addressSettings) > 0 {
-			reqLogger.Info("We have custom address-settings")
-			envVarApplyRule := "APPLY_RULE"
-			envVarApplyRuleValue := newCustomResource.Spec.AddressSettings.ApplyRule
+		var hasAddressSettings bool = len(addressSettings) > 0
 
-			if envVarApplyRuleValue == nil {
-				envVarApplyRuleValue = &defApplyRule
-			}
-			reqLogger.V(1).Info("Process addresssetting", "ApplyRule", *envVarApplyRuleValue)
+		if hasAddressSettings {
+			reqLogger.Info("We have custom address-settings")
 
 			brokerYaml, specials := cr2jinja2.MakeBrokerCfgOverrides(newCustomResource, nil, nil)
 
@@ -1459,21 +1547,11 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 			for k, v := range specials {
 				configSpecials[k] = v
 			}
-
-			applyRule := corev1.EnvVar{
-				Name:  envVarApplyRule,
-				Value: *envVarApplyRuleValue,
-			}
-			environments.Create(Spec.Containers, &applyRule)
-
-			mergeBrokerAs := corev1.EnvVar{
-				Name:  "MERGE_BROKER_AS",
-				Value: "true",
-			}
-			environments.Create(Spec.Containers, &mergeBrokerAs)
 		}
 
-		if len(loggingSettings.Logger) > 0 || len(loggingSettings.Handler) > 0 || len(loggingSettings.Formatter) > 0 {
+		var hasLoggingSettings bool = len(loggingSettings.Logger) > 0 || len(loggingSettings.Handler) > 0 || len(loggingSettings.Formatter) > 0
+
+		if hasLoggingSettings {
 			loggingYaml, specials := cr2jinja2.MakeLoggingCfgOverrides(cachedCustomResource)
 
 			configYaml.WriteString("\n")
@@ -1481,12 +1559,6 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 			for k, v := range specials {
 				configSpecials[k] = v
 			}
-
-			mergeBrokerAs := corev1.EnvVar{
-				Name:  "MERGE_BROKER_LOGGING",
-				Value: "true",
-			}
-			environments.Create(Spec.Containers, &mergeBrokerAs)
 		}
 
 		byteArray, err := json.Marshal(configSpecials)
@@ -1495,36 +1567,118 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 		}
 		jsonSpecials := string(byteArray)
 
-		//resolve initImage
-		initImage := "quay.io/artemiscloud/activemq-artemis-broker-init:0.2"
-		if len(newCustomResource.Spec.DeploymentPlan.InitImage) > 0 {
-			initImage = newCustomResource.Spec.DeploymentPlan.InitImage
-			log.Info("Using customized init image", "url", initImage)
+		envVarTuneFilePath := "TUNE_PATH"
+		outputDir := "/yacfg_etc"
+
+		initCmd := "echo \"" + configYaml.String() + "\" > " + outputDir +
+			"/broker.yaml; cat /yacfg_etc/broker.yaml; yacfg --profile artemis/2.16.0/default_with_user_address_settings.yaml.jinja2  --tune " +
+			outputDir + "/broker.yaml --extra-properties '" + jsonSpecials + "' --output " + outputDir
+		configCmd := "/opt/amq/bin/launch.sh"
+
+		var initArgs []string
+		if customScriptName != nil {
+			initArgs = []string{"-c", initCmd + " && " + configCmd + " && " + *customScriptName}
+		} else {
+			initArgs = []string{"-c", initCmd + " && " + configCmd}
 		}
 
-		InitContainers := []corev1.Container{
-			{
-				Name:    "amq-broker-init",
-				Image:   initImage,
-				Command: []string{"/bin/bash"},
-				Args: []string{"-c",
-					"echo \"" + configYaml.String() + "\" > " + outputDir +
-						"/broker.yaml; cat /yacfg_etc/broker.yaml; yacfg --profile artemis/2.16.0/default_with_user_address_settings.yaml.jinja2  --tune " +
-						outputDir + "/broker.yaml --extra-properties '" + jsonSpecials + "' --output " + outputDir},
-				Resources: newCustomResource.Spec.DeploymentPlan.Resources,
-			},
+		initContainer.Args = initArgs
+
+		//populate args of init container
+
+		Spec.InitContainers = []corev1.Container{
+			initContainer,
 		}
 
-		Spec.InitContainers = InitContainers
-		//create a volumeMount for both init-container and main container
+		if hasAddressSettings {
+			//expose env for address-settings
+
+			envVarApplyRule := "APPLY_RULE"
+			envVarApplyRuleValue := newCustomResource.Spec.AddressSettings.ApplyRule
+
+			if envVarApplyRuleValue == nil {
+				envVarApplyRuleValue = &defApplyRule
+			}
+			reqLogger.V(1).Info("Process addresssetting", "ApplyRule", *envVarApplyRuleValue)
+
+			applyRule := corev1.EnvVar{
+				Name:  envVarApplyRule,
+				Value: *envVarApplyRuleValue,
+			}
+			environments.Create(Spec.InitContainers, &applyRule)
+
+			mergeBrokerAs := corev1.EnvVar{
+				Name:  "MERGE_BROKER_AS",
+				Value: "true",
+			}
+			environments.Create(Spec.InitContainers, &mergeBrokerAs)
+		}
+
+		if hasLoggingSettings {
+			//expose logging related env
+			mergeBrokerAs := corev1.EnvVar{
+				Name:  "MERGE_BROKER_LOGGING",
+				Value: "true",
+			}
+			environments.Create(Spec.InitContainers, &mergeBrokerAs)
+		}
+		//pass cfg file location and apply rule to init container via env vars
+		tuneFile := corev1.EnvVar{
+			Name:  envVarTuneFilePath,
+			Value: outputDir,
+		}
+		environments.Create(Spec.InitContainers, &tuneFile)
+
+		//now make volumes mount available to init image
+		log.Info("mmm making volume mounts")
+
+		//setup volumeMounts
+		volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, *brokerCfgRoot)
+		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
+
 		volumeMountForCfg := volumes.MakeVolumeMountForCfg("tool-dir", outputDir)
-		Spec.Containers[0].VolumeMounts = append(Spec.Containers[0].VolumeMounts, volumeMountForCfg)
-		InitContainers[0].VolumeMounts = append(InitContainers[0].VolumeMounts, volumeMountForCfg)
+		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfg)
 
 		//add empty-dir volume
 		volumeForCfg := volumes.MakeVolumeForCfg("tool-dir")
 		Spec.Volumes = append(Spec.Volumes, volumeForCfg)
+
+		log.Info("Total volumes ", "volumes", Spec.Volumes)
+	} else {
+		log.Info("No loggings and addressetings")
+
+		configCmd := "/opt/amq/bin/launch.sh"
+
+		var initArgs []string
+		if customScriptName != nil {
+			initArgs = []string{"-c", configCmd + " && " + *customScriptName}
+		} else {
+			initArgs = []string{"-c", configCmd}
+		}
+		initContainer.Args = initArgs
+
+		Spec.InitContainers = []corev1.Container{
+			initContainer,
+		}
+
+		volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, *brokerCfgRoot)
+		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
 	}
+
+	dontRun := corev1.EnvVar{
+		Name:  "RUN_BROKER",
+		Value: "false",
+	}
+	environments.Create(Spec.InitContainers, &dontRun)
+
+	envBrokerCustomInstanceDir = corev1.EnvVar{
+		Name:  "CONFIG_INSTANCE_DIR",
+		Value: *brokerCfgRoot,
+	}
+	environments.Create(Spec.InitContainers, &envBrokerCustomInstanceDir)
+
+	log.Info("Final Init spec", "Detail", Spec.InitContainers)
+
 	pts.Spec = Spec
 
 	return pts

@@ -206,6 +206,36 @@ spec:
             x-descriptors:
               - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:deploymentPlan'
               - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - description: The path where broker configuration files locate.
+            displayName: BrokerCfgRootDir
+            path: deploymentPlan.customInitImage.brokerCfgRootDir
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:deploymentPlan'
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The path and name of the custom init configuration script.
+            displayName: BrokerInstallScript
+            path: deploymentPlan.customInitImage.brokerInstallScript
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:deploymentPlan'
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The name for custom init image
+            displayName: Name
+            path: deploymentPlan.customInitImage.imageSpec.name
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:deploymentPlan'
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The custom init image url
+            displayName: Image
+            path: deploymentPlan.customInitImage.imageSpec.image
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:deploymentPlan'
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The custom init image pull policy
+            displayName: ImagePullPolicy
+            path: deploymentPlan.customInitImage.imageSpec.imagePullPolicy
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:deploymentPlan'
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
 
           - description:  A single acceptor configuration
             displayName: Name

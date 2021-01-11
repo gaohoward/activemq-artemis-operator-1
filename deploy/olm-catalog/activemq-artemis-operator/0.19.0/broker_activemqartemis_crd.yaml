@@ -571,6 +571,37 @@ spec:
                     initImage:
                       description: The init container image used to configure broker
                       type: string
+                    customInitImage:
+                      description: Configure user supplied init container image used to configure broker
+                      type: object
+                      properties:
+                        brokerCfgRootDir:
+                          description: >-
+                            The path where broker configuration files locate. The operator
+                            guarantees that the location exists and writable so that the init
+                            image can put its configuration files in this path. The configuration
+                            files are copied into broker pod config dir. Default is /broker_cfg_root
+                          type: string
+                        brokerInstallScript:
+                          description: >-
+                            The path and name of the install script. The install script
+                            must be an executable. The script will be invoked before lauching
+                            the broker giving a chance to customize broker configuration.
+                          type: string
+                        imageSpec:
+                          description: Custom init container image used to configure broker
+                          type: object
+                          properties:
+                            name:
+                              description: the init image name
+                              type: string
+                            image:
+                              description: The image url. If not specified the value is taken
+                                from initImage
+                              type: string
+                            imagePullPolicy:
+                              description: policy for if/when to pull a container image
+                              type: string
                     journalType:
                       description: 'If aio use ASYNCIO, if nio use NIO for journal IO'
                       type: string

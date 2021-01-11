@@ -54,6 +54,12 @@ func isSpecialValue(value string) bool {
 	if strings.Contains(value, "$") {
 		return true
 	}
+	if strings.Contains(value, "*") {
+		return true
+	}
+	if strings.Contains(value, "#") {
+		return true
+	}
 	return false
 }
 
@@ -305,11 +311,9 @@ func processAddressSettings(sb *strings.Builder, addressSettings *[]v2alpha3.Add
 	}
 	sb.WriteString("user_address_settings:\n")
 	for _, s := range *addressSettings {
-		matchValue := s.Match
-		if s.Match == "#" {
-			matchValue = "'#'"
+		if matchValue := checkStringSpecial(&s.Match, specials); matchValue != nil {
+			sb.WriteString("- match: " + *matchValue + "\n")
 		}
-		sb.WriteString("- match: " + matchValue + "\n")
 		if value := checkStringSpecial(s.DeadLetterAddress, specials); value != nil {
 			sb.WriteString("  dead_letter_address: " + *value + "\n")
 		}

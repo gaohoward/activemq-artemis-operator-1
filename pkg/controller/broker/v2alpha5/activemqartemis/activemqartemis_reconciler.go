@@ -73,7 +73,6 @@ var defaultMessageMigration bool = true
 var requestedResources []resource.KubernetesResource
 var lastStatus olm.DeploymentStatus
 
-var defaultBrokerScriptDir string = "/custom_bin"
 var defaultBrokerCfgRoot string = "/broker_cfg_root"
 var defaultBrokerConfigScript = "/opt/amq-broker/script/default.sh"
 

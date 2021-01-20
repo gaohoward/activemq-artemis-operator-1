@@ -1511,14 +1511,16 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM, cr *brokerv2alpha5.ActiveM
 		initImgName = "amq-broker-init"
 	}
 
-	var pullPolicy corev1.PullPolicy = corev1.PullIfNotPresent
+	var pullPolicy corev1.PullPolicy = ""
 	if customInitUsed != nil && customInitUsed.ImagePullPolicy != ("") {
 		pullPolicy = customInitUsed.ImagePullPolicy
 	}
 
 	initContainer.Name = initImgName
 	initContainer.Image = initImage
-	initContainer.ImagePullPolicy = pullPolicy
+	if pullPolicy != "" {
+		initContainer.ImagePullPolicy = pullPolicy
+	}
 	initContainer.Command = []string{"/bin/bash"}
 	initContainer.Resources = newCustomResource.Spec.DeploymentPlan.Resources
 

@@ -39,6 +39,16 @@ spec:
               type: string
             removeFromBrokerOnDelete:
               type: boolean
+            # Todo: this requires to bump crd to version v2alpha3!
+            targetBrokerCrNames:
+              description: >-
+                The broker custom resource names (statefulsets) to which this CR is applied
+                A value of * means all statefulsets
+                if not specified it means all statefulsets
+              type: array
+              minItems: 0
+              items:
+                type: string
         status:
           type: object
   versions:

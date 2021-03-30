@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/random"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 	corev1 "k8s.io/api/core/v1"
@@ -15,9 +14,6 @@ import (
 )
 
 var log = logf.Log.WithName("package secrets")
-var CredentialsNameBuilder namer.NamerData
-var ConsoleNameBuilder namer.NamerData
-var NettyNameBuilder namer.NamerData
 
 func MakeStringDataMap(keyName string, valueName string, key string, value string) map[string]string {
 

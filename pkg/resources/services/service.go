@@ -1,7 +1,6 @@
 package services
 
 import (
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,14 +11,11 @@ import (
 
 var log = logf.Log.WithName("package services")
 
-var HeadlessNameBuilder namer.NamerData
-var PingNameBuilder namer.NamerData
-
 //var ServiceNameBuilderArray []namer.NamerData
 //var RouteNameBuilderArray []namer.NamerData
 
 // newServiceForPod returns an activemqartemis service for the pod just created
-func NewHeadlessServiceForCR(namespacedName types.NamespacedName, servicePorts *[]corev1.ServicePort) *corev1.Service {
+func NewHeadlessServiceForCR(serviceName string, namespacedName types.NamespacedName, servicePorts *[]corev1.ServicePort) *corev1.Service {
 
 	labels := selectors.LabelBuilder.Labels()
 
@@ -31,7 +27,7 @@ func NewHeadlessServiceForCR(namespacedName types.NamespacedName, servicePorts *
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: nil,
 			Labels:      labels,
-			Name:        HeadlessNameBuilder.Name(),
+			Name:        serviceName,
 			Namespace:   namespacedName.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
@@ -83,7 +79,7 @@ func NewServiceDefinitionForCR(namespacedName types.NamespacedName, nameSuffix s
 }
 
 // newServiceForPod returns an activemqartemis service for the pod just created
-func NewPingServiceDefinitionForCR(namespacedName types.NamespacedName, labels map[string]string, selectorLabels map[string]string) *corev1.Service {
+func NewPingServiceDefinitionForCR(serviceName string, namespacedName types.NamespacedName, labels map[string]string, selectorLabels map[string]string) *corev1.Service {
 
 	port := corev1.ServicePort{
 		Protocol:   "TCP",
@@ -101,7 +97,7 @@ func NewPingServiceDefinitionForCR(namespacedName types.NamespacedName, labels m
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: nil,
 			Labels:      labels,
-			Name:        PingNameBuilder.Name(),
+			Name:        serviceName,
 			Namespace:   namespacedName.Namespace,
 		},
 		Spec: corev1.ServiceSpec{

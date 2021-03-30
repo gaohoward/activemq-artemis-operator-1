@@ -19,12 +19,10 @@ package v2alpha2activemqartemisaddress
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	mgmt "github.com/artemiscloud/activemq-artemis-management"
 	clientv2alpha1 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v2alpha1"
-	ss "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,28 +76,28 @@ func (c *AddressObserver) Run(C chan types.NamespacedName) error {
 	return nil
 }
 
+//if we support multiple statefulset in a namespace
+//the pod may came from any stateful set
+//so we need to check if the pod belongs to the statefulset(cr)
+//that this address intends to be applied to
+//that why we need one more property (targetBrokerCrName)
+//and only apply addresses to those pods that in that SS.
+//The property should be optional to keep backward compatibility
+//and return error if multiple statefulsets exists while the property
+//is not specified. (or apply to all pods)
 func (c *AddressObserver) newPodReady(ready *types.NamespacedName) {
 
 	log.Info("New pod ready.", "Pod", ready)
 
 	//find out real name of the pod basename-(num - 1)
-	podBaseName := ss.NameBuilder.Name()
-	originalName := ready.Name
-
-	if len(podBaseName) > len(originalName)-2 {
-		log.Info("Original pod name too short", "pod name", originalName, "base", podBaseName)
+	//podBaseNames is our interested statefulsets name
+	podBaseName, podSerial := GetStatefulSetNameForPod(ready)
+	if podBaseName == "" {
+		log.Info("Pod is not a candidate")
 		return
 	}
 
-	podSerial := originalName[len(podBaseName)+1:]
-
-	//convert to int
-	i, err := strconv.Atoi(podSerial)
-	if err != nil || i < 1 {
-		log.Error(err, "failed to convert pod name", "pod", originalName)
-	}
-
-	realPodName := fmt.Sprintf("%s-%d", podBaseName, i-1)
+	realPodName := fmt.Sprintf("%s-%d", podBaseName, podSerial-1)
 
 	podNamespacedName := types.NamespacedName{ready.Namespace, realPodName}
 	pod := &corev1.Pod{}

@@ -18,12 +18,9 @@ package draincontroller
 
 import (
 	"fmt"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/environments"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	"os"
 	"time"
 
-	svc "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/services"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,11 +38,12 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/labels"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sort"
 	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/labels"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log = logf.Log.WithName("controller_v2alpha1activemqartemisscaledown")
@@ -93,6 +91,8 @@ type Controller struct {
 	recorder record.EventRecorder
 
 	localOnly bool
+
+	ssNames map[string]string
 }
 
 // NewController returns a new sample controller
@@ -100,7 +100,8 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
 	namespace string,
-	localOnly bool) *Controller {
+	localOnly bool,
+	ssNames map[string]string) *Controller {
 
 	// obtain references to shared index informers for the Deployment and Foo
 	// types.
@@ -129,6 +130,7 @@ func NewController(
 		workqueue:          workqueue.NewNamedRateLimitingQueue(itemExponentialFailureRateLimiter, "StatefulSets"),
 		recorder:           recorder,
 		localOnly:          localOnly,
+		ssNames:            ssNames,
 	}
 
 	log.Info("Setting up event handlers")
@@ -406,7 +408,7 @@ func (c *Controller) processStatefulSet(sts *appsv1.StatefulSet) error {
 					continue
 				}
 
-				pod, err := newPod(sts, ordinal)
+				pod, err := c.newPod(sts, ordinal)
 				if err != nil {
 					return fmt.Errorf("Can't create drain Pod object: %s", err)
 				}
@@ -606,16 +608,16 @@ func (c *Controller) cachesSynced() bool {
 	return true // TODO do we even need this?
 }
 
-func newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
+func (c *Controller) newPod(sts *appsv1.StatefulSet, ordinal int) (*corev1.Pod, error) {
 
 	//podTemplateJson := sts.Annotations[AnnotationDrainerPodTemplate]
 	//TODO: Remove this blatant hack
 	podTemplateJson := globalPodTemplateJson
-	podTemplateJson = strings.Replace(podTemplateJson, "CRNAME", statefulsets.GLOBAL_CRNAME, -1)
-	podTemplateJson = strings.Replace(podTemplateJson, "CLUSTERUSER", environments.GLOBAL_AMQ_CLUSTER_USER, 1)
-	podTemplateJson = strings.Replace(podTemplateJson, "CLUSTERPASS", environments.GLOBAL_AMQ_CLUSTER_PASSWORD, 1)
-	podTemplateJson = strings.Replace(podTemplateJson, "HEADLESSSVCNAMEVALUE", svc.HeadlessNameBuilder.Name(), 1)
-	podTemplateJson = strings.Replace(podTemplateJson, "PINGSVCNAMEVALUE", svc.PingNameBuilder.Name(), 1)
+	podTemplateJson = strings.Replace(podTemplateJson, "CRNAME", c.ssNames["CRNAME"], -1)
+	podTemplateJson = strings.Replace(podTemplateJson, "CLUSTERUSER", c.ssNames["CLUSTERUSER"], 1)
+	podTemplateJson = strings.Replace(podTemplateJson, "CLUSTERPASS", c.ssNames["CLUSTERPASS"], 1)
+	podTemplateJson = strings.Replace(podTemplateJson, "HEADLESSSVCNAMEVALUE", c.ssNames["HEADLESSSVCNAMEVALUE"], 1)
+	podTemplateJson = strings.Replace(podTemplateJson, "PINGSVCNAMEVALUE", c.ssNames["PINGSVCNAMEVALUE"], 1)
 	podTemplateJson = strings.Replace(podTemplateJson, "SERVICE_ACCOUNT", os.Getenv("SERVICE_ACCOUNT"), 1)
 	podTemplateJson = strings.Replace(podTemplateJson, "SERVICE_ACCOUNT_NAME", os.Getenv("SERVICE_ACCOUNT"), 1)
 	image := sts.Spec.Template.Spec.Containers[0].Image

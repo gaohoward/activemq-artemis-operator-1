@@ -6,9 +6,13 @@ import (
 
 	mgmt "github.com/artemiscloud/activemq-artemis-management"
 	brokerv2alpha2 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v2alpha2"
+	v2alpha4 "github.com/artemiscloud/activemq-artemis-operator/pkg/controller/broker/v2alpha4/activemqartemis"
+
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/secrets"
 	ss "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/channels"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,10 +31,14 @@ import (
 )
 
 var log = logf.Log.WithName("controller_v2alpha2activemqartemisaddress")
-var namespacedNameToAddressName = make(map[types.NamespacedName]brokerv2alpha2.ActiveMQArtemisAddress)
 
-//This channel is used to receive new ready pods
-var C = make(chan types.NamespacedName)
+type AddressDeployment struct {
+	AddressResource brokerv2alpha2.ActiveMQArtemisAddress
+	//a 0-len array means all statefulsets
+	SsTargetNameBuilders []namer.NamerData
+}
+
+var namespacedNameToAddressName = make(map[types.NamespacedName]AddressDeployment)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -45,7 +53,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	go setupAddressObserver(mgr, C)
+	go setupAddressObserver(mgr, channels.AddressListeningCh)
 	return &ReconcileActiveMQArtemisAddress{client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
@@ -70,7 +78,7 @@ func setupAddressObserver(mgr manager.Manager, c chan types.NamespacedName) {
 
 	observer := NewAddressObserver(kubeClient, namespace, mgr.GetClient())
 
-	if err = observer.Run(C); err != nil {
+	if err = observer.Run(channels.AddressListeningCh); err != nil {
 		log.Error(err, "Error running controller: %s", err.Error())
 	}
 
@@ -135,7 +143,7 @@ func (r *ReconcileActiveMQArtemisAddress) Reconcile(request reconcile.Request) (
 		addressInstance, lookupSucceeded := namespacedNameToAddressName[request.NamespacedName]
 
 		if lookupSucceeded {
-			if addressInstance.Spec.RemoveFromBrokerOnDelete {
+			if addressInstance.AddressResource.Spec.RemoveFromBrokerOnDelete {
 				err = deleteQueue(&addressInstance, request, r.client)
 			} else {
 				log.Info("Not to delete address", "address", addressInstance)
@@ -153,16 +161,36 @@ func (r *ReconcileActiveMQArtemisAddress) Reconcile(request reconcile.Request) (
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	} else {
-		err = createQueue(instance, request, r.client)
+		addressDeployment := AddressDeployment{
+			AddressResource:      *instance,
+			SsTargetNameBuilders: createNameBuilders(instance),
+		}
+		err = createQueue(&addressDeployment, request, r.client)
 		if nil == err {
-			namespacedNameToAddressName[request.NamespacedName] = *instance //.Spec.QueueName
+			namespacedNameToAddressName[request.NamespacedName] = addressDeployment
 		}
 	}
 
 	return reconcile.Result{}, nil
 }
 
-func createQueue(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconcile.Request, client client.Client) error {
+func createNameBuilders(instance *brokerv2alpha2.ActiveMQArtemisAddress) []namer.NamerData {
+	var nameBuilders []namer.NamerData = nil
+	for _, crName := range instance.Spec.TargetBrokerCrNames {
+		if crName != "*" {
+			builder := namer.CreateStatefulSetNameBuilder(crName)
+			log.Info("created a new name builder", "builder", builder, "buldername", builder.Name())
+			nameBuilders = append(nameBuilders, builder)
+			log.Info("added one builder for "+crName, "builders", nameBuilders, "len", len(nameBuilders))
+		} else {
+			return nil
+		}
+	}
+	log.Info("Created ss name builder for addr", "instance", instance, "builders", nameBuilders)
+	return nameBuilders
+}
+
+func createQueue(instance *AddressDeployment, request reconcile.Request, client client.Client) error {
 
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Creating ActiveMQArtemisAddress")
@@ -175,12 +203,12 @@ func createQueue(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconc
 				reqLogger.Info("Creating ActiveMQArtemisAddress artemisArray had a nil!")
 				continue
 			}
-			_, err := a.CreateQueue(instance.Spec.AddressName, instance.Spec.QueueName, instance.Spec.RoutingType)
+			_, err := a.CreateQueue(instance.AddressResource.Spec.AddressName, instance.AddressResource.Spec.QueueName, instance.AddressResource.Spec.RoutingType)
 			if nil != err {
-				reqLogger.Info("Creating ActiveMQArtemisAddress error for " + instance.Spec.QueueName)
+				reqLogger.Info("Creating ActiveMQArtemisAddress error for " + instance.AddressResource.Spec.QueueName)
 				break
 			} else {
-				reqLogger.Info("Created ActiveMQArtemisAddress for " + instance.Spec.QueueName)
+				reqLogger.Info("Created ActiveMQArtemisAddress for " + instance.AddressResource.Spec.QueueName)
 			}
 		}
 	}
@@ -188,7 +216,7 @@ func createQueue(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconc
 	return err
 }
 
-func deleteQueue(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconcile.Request, client client.Client) error {
+func deleteQueue(instance *AddressDeployment, request reconcile.Request, client client.Client) error {
 
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Deleting ActiveMQArtemisAddress")
@@ -197,20 +225,20 @@ func deleteQueue(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconc
 	artemisArray := getPodBrokers(instance, request, client)
 	if nil != artemisArray {
 		for _, a := range artemisArray {
-			_, err := a.DeleteQueue(instance.Spec.QueueName)
+			_, err := a.DeleteQueue(instance.AddressResource.Spec.QueueName)
 			if nil != err {
-				reqLogger.Info("Deleting ActiveMQArtemisAddress error for " + instance.Spec.QueueName)
+				reqLogger.Info("Deleting ActiveMQArtemisAddress error for " + instance.AddressResource.Spec.QueueName)
 				break
 			} else {
-				reqLogger.Info("Deleted ActiveMQArtemisAddress for " + instance.Spec.QueueName)
-				reqLogger.Info("Checking parent address for bindings " + instance.Spec.AddressName)
-				bindingsData, err := a.ListBindingsForAddress(instance.Spec.AddressName)
+				reqLogger.Info("Deleted ActiveMQArtemisAddress for " + instance.AddressResource.Spec.QueueName)
+				reqLogger.Info("Checking parent address for bindings " + instance.AddressResource.Spec.AddressName)
+				bindingsData, err := a.ListBindingsForAddress(instance.AddressResource.Spec.AddressName)
 				if nil == err {
 					if "" == bindingsData.Value {
-						reqLogger.Info("No bindings found removing " + instance.Spec.AddressName)
-						a.DeleteAddress(instance.Spec.AddressName)
+						reqLogger.Info("No bindings found removing " + instance.AddressResource.Spec.AddressName)
+						a.DeleteAddress(instance.AddressResource.Spec.AddressName)
 					} else {
-						reqLogger.Info("Bindings found, not removing " + instance.Spec.AddressName)
+						reqLogger.Info("Bindings found, not removing " + instance.AddressResource.Spec.AddressName)
 					}
 				}
 			}
@@ -220,83 +248,80 @@ func deleteQueue(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconc
 	return err
 }
 
-func getPodBrokers(instance *brokerv2alpha2.ActiveMQArtemisAddress, request reconcile.Request, client client.Client) []*mgmt.Artemis {
+func getPodBrokers(instance *AddressDeployment, request reconcile.Request, client client.Client) []*mgmt.Artemis {
 
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Getting Pod Brokers")
+	reqLogger.Info("Getting Pod Brokers", "instance", instance)
 
 	var artemisArray []*mgmt.Artemis = nil
-	var err error = nil
 
-	ss.NameBuilder.Name()
-	if err != nil {
-		reqLogger.Error(err, "Failed to ge the statefulset name")
-	}
+	targetCrNamespacedNames := createTargetCrNamespacedNames(request.Namespace, instance.AddressResource.Spec.TargetBrokerCrNames)
 
-	// Check to see if the statefulset already exists
-	ssNamespacedName := types.NamespacedName{
-		Name:      ss.NameBuilder.Name(),
-		Namespace: request.Namespace,
-	}
+	log.Info("target Cr names", "result", targetCrNamespacedNames)
 
-	statefulset, err := ss.RetrieveStatefulSet(ss.NameBuilder.Name(), ssNamespacedName, client)
-	if nil != err {
-		reqLogger.Info("Statefulset: " + ssNamespacedName.Name + " not found")
-	} else {
-		reqLogger.Info("Statefulset: " + ssNamespacedName.Name + " found")
+	var ssNames []types.NamespacedName = v2alpha4.GetDeployedStatefuleSetNames(targetCrNamespacedNames)
 
-		pod := &corev1.Pod{}
-		podNamespacedName := types.NamespacedName{
-			Name:      statefulset.Name + "-0",
-			Namespace: request.Namespace,
-		}
+	for _, ssNamespacedName := range ssNames {
+		log.Info("retriving ss by name", "ssName", ssNamespacedName)
+		statefulset, err := ss.RetrieveStatefulSet(ssNamespacedName.Name, ssNamespacedName, client)
+		if nil != err {
+			reqLogger.Error(err, "error retriving ss")
+			reqLogger.Info("Statefulset: " + ssNamespacedName.Name + " not found")
+		} else {
+			reqLogger.Info("Statefulset: " + ssNamespacedName.Name + " found")
+			pod := &corev1.Pod{}
+			podNamespacedName := types.NamespacedName{
+				Name:      statefulset.Name + "-0",
+				Namespace: request.Namespace,
+			}
 
-		// For each of the replicas
-		var i int = 0
-		var replicas int = int(*statefulset.Spec.Replicas)
-		artemisArray = make([]*mgmt.Artemis, 0, replicas)
-		for i = 0; i < replicas; i++ {
-			s := statefulset.Name + "-" + strconv.Itoa(i)
-			podNamespacedName.Name = s
-			if err = client.Get(context.TODO(), podNamespacedName, pod); err != nil {
-				if errors.IsNotFound(err) {
-					reqLogger.Error(err, "Pod IsNotFound", "Namespace", request.Namespace, "Name", request.Name)
+			// For each of the replicas
+			var i int = 0
+			var replicas int = int(*statefulset.Spec.Replicas)
+			artemisArray = make([]*mgmt.Artemis, 0, replicas)
+			for i = 0; i < replicas; i++ {
+				s := statefulset.Name + "-" + strconv.Itoa(i)
+				podNamespacedName.Name = s
+				if err = client.Get(context.TODO(), podNamespacedName, pod); err != nil {
+					if errors.IsNotFound(err) {
+						reqLogger.Error(err, "Pod IsNotFound", "Namespace", request.Namespace, "Name", request.Name)
+					} else {
+						reqLogger.Error(err, "Pod lookup error", "Namespace", request.Namespace, "Name", request.Name)
+					}
 				} else {
-					reqLogger.Error(err, "Pod lookup error", "Namespace", request.Namespace, "Name", request.Name)
-				}
-			} else {
-				reqLogger.Info("Pod found", "Namespace", request.Namespace, "Name", request.Name)
-				containers := pod.Spec.Containers //get env from this
-				var jolokiaUser string
-				var jolokiaPassword string
-				var jolokiaProtocol string
-				if len(containers) == 1 {
-					envVars := containers[0].Env
-					for _, oneVar := range envVars {
-						if "AMQ_USER" == oneVar.Name {
-							jolokiaUser = getEnvVarValue(&oneVar, &podNamespacedName, statefulset, client)
-						}
-						if "AMQ_PASSWORD" == oneVar.Name {
-							jolokiaPassword = getEnvVarValue(&oneVar, &podNamespacedName, statefulset, client)
-						}
-						if "AMQ_CONSOLE_ARGS" == oneVar.Name {
-							jolokiaProtocol = getEnvVarValue(&oneVar, &podNamespacedName, statefulset, client)
-						}
-						if jolokiaUser != "" && jolokiaPassword != "" && jolokiaProtocol != "" {
-							break
+					reqLogger.Info("Pod found", "Namespace", request.Namespace, "Name", request.Name)
+					containers := pod.Spec.Containers //get env from this
+					var jolokiaUser string
+					var jolokiaPassword string
+					var jolokiaProtocol string
+					if len(containers) == 1 {
+						envVars := containers[0].Env
+						for _, oneVar := range envVars {
+							if "AMQ_USER" == oneVar.Name {
+								jolokiaUser = getEnvVarValue(&oneVar, &podNamespacedName, statefulset, client)
+							}
+							if "AMQ_PASSWORD" == oneVar.Name {
+								jolokiaPassword = getEnvVarValue(&oneVar, &podNamespacedName, statefulset, client)
+							}
+							if "AMQ_CONSOLE_ARGS" == oneVar.Name {
+								jolokiaProtocol = getEnvVarValue(&oneVar, &podNamespacedName, statefulset, client)
+							}
+							if jolokiaUser != "" && jolokiaPassword != "" && jolokiaProtocol != "" {
+								break
+							}
 						}
 					}
-				}
 
-				if jolokiaProtocol == "" {
-					jolokiaProtocol = "http"
-				} else {
-					jolokiaProtocol = "https"
-				}
+					if jolokiaProtocol == "" {
+						jolokiaProtocol = "http"
+					} else {
+						jolokiaProtocol = "https"
+					}
 
-				reqLogger.Info("New Jolokia with ", "User: ", jolokiaUser, "Protocol: ", jolokiaProtocol)
-				artemis := mgmt.GetArtemis(pod.Status.PodIP, "8161", "amq-broker", jolokiaUser, jolokiaPassword, jolokiaProtocol)
-				artemisArray = append(artemisArray, artemis)
+					reqLogger.Info("New Jolokia with ", "User: ", jolokiaUser, "Protocol: ", jolokiaProtocol)
+					artemis := mgmt.GetArtemis(pod.Status.PodIP, "8161", "amq-broker", jolokiaUser, jolokiaPassword, jolokiaProtocol)
+					artemisArray = append(artemisArray, artemis)
+				}
 			}
 		}
 	}
@@ -344,4 +369,63 @@ func getEnvVarValueFromSecret(envName string, varSource *corev1.EnvVarSource, na
 		}
 	}
 	return result
+}
+
+func createTargetCrNamespacedNames(namespace string, targetCrNames []string) []types.NamespacedName {
+	var result []types.NamespacedName = nil
+	for _, crName := range targetCrNames {
+		result = append(result, types.NamespacedName{
+			Namespace: namespace,
+			Name:      crName,
+		})
+	}
+	return result
+}
+
+func GetStatefulSetNameForPod(pod *types.NamespacedName) (string, int) {
+	for crName, addressDeployment := range namespacedNameToAddressName {
+		if crName.Namespace != pod.Namespace {
+			return "", -1
+		}
+		if len(addressDeployment.SsTargetNameBuilders) == 0 {
+			//deploy to all sts, need get from broker controller
+			ssNames := v2alpha4.GetDeployedStatefuleSetNames(nil)
+			if len(ssNames) == 0 {
+				return "", -1
+			}
+			for _, ssName := range ssNames {
+				if ok, podSerial := podBelongsToStatefulset(pod, &ssName.Name); ok {
+					return ssName.Name, podSerial
+				}
+			}
+			return "", -1
+		}
+		//iterate and check the ss name
+		for _, ssNameBuilder := range addressDeployment.SsTargetNameBuilders {
+			ssName := ssNameBuilder.Name()
+			if ok, podSerial := podBelongsToStatefulset(pod, &ssName); ok {
+				return ssName, podSerial
+			}
+		}
+	}
+	return "", -1
+}
+
+func podBelongsToStatefulset(pod *types.NamespacedName, ssName *string) (bool, int) {
+	//pod name must be <ss>-<n>
+	if len(*ssName) > len(pod.Name)-2 {
+		log.Info("Original pod name too short", "pod name", pod.Name, "base", ssName)
+		return false, -1
+	}
+
+	podSerial := pod.Name[len(*ssName)+1:]
+
+	//convert to int
+	i, err := strconv.Atoi(podSerial)
+	if err != nil || i < 1 {
+		log.Error(err, "failed to convert pod name", "pod", pod)
+		return false, -1
+	}
+
+	return true, i
 }

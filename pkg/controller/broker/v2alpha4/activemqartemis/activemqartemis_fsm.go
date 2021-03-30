@@ -2,8 +2,8 @@ package v2alpha4activemqartemis
 
 import (
 	brokerv2alpha4 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v2alpha4"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/fsm"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -57,12 +57,24 @@ const (
 	ActiveMQArtemisFSMID = 0
 )
 
+type Namers struct {
+	SsGlobalName                  string
+	SsNameBuilder                 namer.NamerData
+	SvcHeadlessNameBuilder        namer.NamerData
+	SvcPingNameBuilder            namer.NamerData
+	PodsNameBuilder               namer.NamerData
+	SecretsCredentialsNameBuilder namer.NamerData
+	SecretsConsoleNameBuilder     namer.NamerData
+	SecretsNettyNameBuilder       namer.NamerData
+}
+
 type ActiveMQArtemisFSM struct {
 	m                  fsm.IMachine
 	namespacedName     types.NamespacedName
 	customResource     *brokerv2alpha4.ActiveMQArtemis
 	prevCustomResource *brokerv2alpha4.ActiveMQArtemis
 	r                  *ReconcileActiveMQArtemis
+	namers             Namers
 }
 
 // Need to deep-copy the instance?
@@ -80,6 +92,16 @@ func MakeActiveMQArtemisFSM(instance *brokerv2alpha4.ActiveMQArtemis, _namespace
 	amqbfsm.customResource = instance
 	amqbfsm.prevCustomResource = &brokerv2alpha4.ActiveMQArtemis{}
 	amqbfsm.r = r
+	amqbfsm.namers = Namers{
+		SsGlobalName:                  "",
+		SsNameBuilder:                 namer.NamerData{},
+		SvcHeadlessNameBuilder:        namer.NamerData{},
+		SvcPingNameBuilder:            namer.NamerData{},
+		PodsNameBuilder:               namer.NamerData{},
+		SecretsCredentialsNameBuilder: namer.NamerData{},
+		SecretsConsoleNameBuilder:     namer.NamerData{},
+		SecretsNettyNameBuilder:       namer.NamerData{},
+	}
 
 	// TODO: Fix disconnect here between passing the parent and being added later as adding implies parenthood
 	creatingK8sResourceState := MakeCreatingK8sResourcesState(&amqbfsm, _namespacedName)
@@ -106,6 +128,18 @@ func NewActiveMQArtemisFSM(instance *brokerv2alpha4.ActiveMQArtemis, _namespaced
 func (amqbfsm *ActiveMQArtemisFSM) Add(s *fsm.IState) {
 
 	amqbfsm.m.Add(s)
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GenerateNames() {
+	amqbfsm.namers.SsNameBuilder.Base(amqbfsm.customResource.Name).Suffix("ss").Generate()
+	amqbfsm.namers.SsGlobalName = amqbfsm.customResource.Name
+	amqbfsm.namers.SvcHeadlessNameBuilder.Prefix(amqbfsm.customResource.Name).Base("hdls").Suffix("svc").Generate()
+	amqbfsm.namers.SvcPingNameBuilder.Prefix(amqbfsm.customResource.Name).Base("ping").Suffix("svc").Generate()
+	amqbfsm.namers.PodsNameBuilder.Base(amqbfsm.customResource.Name).Suffix("container").Generate()
+	amqbfsm.namers.SecretsCredentialsNameBuilder.Prefix(amqbfsm.customResource.Name).Base("credentials").Suffix("secret").Generate()
+	amqbfsm.namers.SecretsConsoleNameBuilder.Prefix(amqbfsm.customResource.Name).Base("console").Suffix("secret").Generate()
+	amqbfsm.namers.SecretsNettyNameBuilder.Prefix(amqbfsm.customResource.Name).Base("netty").Suffix("secret").Generate()
+	log.Info("mmmm all namers in fsm generated!", "ssbuild", amqbfsm.namers.SsNameBuilder.Name())
 }
 
 func (amqbfsm *ActiveMQArtemisFSM) Remove(s *fsm.IState) {
@@ -142,7 +176,7 @@ func (amqbfsm *ActiveMQArtemisFSM) Update() (error, int) {
 	// Was the current state complete?
 	amqbfsm.r.result = reconcile.Result{}
 	err, nextStateID := amqbfsm.m.Update()
-	ssNamespacedName := types.NamespacedName{Name: statefulsets.NameBuilder.Name(), Namespace: amqbfsm.customResource.Namespace}
+	ssNamespacedName := types.NamespacedName{Name: amqbfsm.namers.SsNameBuilder.Name(), Namespace: amqbfsm.customResource.Namespace}
 	UpdatePodStatus(amqbfsm.customResource, amqbfsm.r.client, ssNamespacedName)
 
 	return err, nextStateID
@@ -154,4 +188,36 @@ func (amqbfsm *ActiveMQArtemisFSM) Exit() error {
 	err := amqbfsm.m.Exit()
 
 	return err
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetStatefulSetNamespacedName() types.NamespacedName {
+	var result types.NamespacedName = types.NamespacedName{
+		Namespace: amqbfsm.namespacedName.Namespace,
+		Name:      amqbfsm.namers.SsNameBuilder.Name(),
+	}
+	return result
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetHeadlessServiceName() string {
+	return amqbfsm.namers.SvcHeadlessNameBuilder.Name()
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetPingServiceName() string {
+	return amqbfsm.namers.SvcPingNameBuilder.Name()
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetCredentialsSecretName() string {
+	return amqbfsm.namers.SecretsCredentialsNameBuilder.Name()
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetNettySecretName() string {
+	return amqbfsm.namers.SecretsNettyNameBuilder.Name()
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetConsoleSecretName() string {
+	return amqbfsm.namers.SecretsConsoleNameBuilder.Name()
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) GetStatefulSetName() string {
+	return amqbfsm.namers.SsNameBuilder.Name()
 }

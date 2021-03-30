@@ -1,7 +1,6 @@
 package pods
 
 import (
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -9,7 +8,6 @@ import (
 )
 
 var log = logf.Log.WithName("package pods")
-var NameBuilder namer.NamerData
 
 //func NewPodTemplateSpecForCR(namespacedName types.NamespacedName, envVarArray []corev1.EnvVar) corev1.PodTemplateSpec {
 //

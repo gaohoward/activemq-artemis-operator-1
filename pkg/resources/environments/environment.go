@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	svc "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/services"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/random"
 	corev1 "k8s.io/api/core/v1"
 
@@ -97,7 +96,7 @@ func DetectOpenshift() (bool, error) {
 	return err == nil, nil
 }
 
-func AddEnvVarForBasic(requireLogin string, journalType string) []corev1.EnvVar {
+func AddEnvVarForBasic(requireLogin string, journalType string, svcPingName string) []corev1.EnvVar {
 
 	envVarArray := []corev1.EnvVar{
 		{
@@ -167,7 +166,7 @@ func AddEnvVarForBasic(requireLogin string, journalType string) []corev1.EnvVar 
 		},
 		{
 			"PING_SVC_NAME",
-			svc.PingNameBuilder.Name(),
+			svcPingName,
 			nil,
 		},
 	}

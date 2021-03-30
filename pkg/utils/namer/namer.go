@@ -49,3 +49,9 @@ func (n *NamerData) Suffix(nameSuffix string) *NamerData {
 func (n *NamerData) Name() string {
 	return n.name
 }
+
+func CreateStatefulSetNameBuilder(crName string) NamerData {
+	ssNameBuilder := NamerData{}
+	ssNameBuilder.Base(crName).Suffix("ss").Generate()
+	return ssNameBuilder
+}

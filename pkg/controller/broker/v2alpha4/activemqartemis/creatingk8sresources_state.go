@@ -3,12 +3,9 @@ package v2alpha4activemqartemis
 import (
 	"context"
 
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/pods"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/secrets"
 	corev1 "k8s.io/api/core/v1"
 
-	svc "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/services"
-	ss "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/volumes"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/fsm"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
@@ -63,14 +60,7 @@ func (rs *CreatingK8sResourcesState) ID() int {
 func (rs *CreatingK8sResourcesState) generateNames() {
 
 	// Initialize the kubernetes names
-	ss.NameBuilder.Base(rs.parentFSM.customResource.Name).Suffix("ss").Generate()
-	ss.GLOBAL_CRNAME = rs.parentFSM.customResource.Name
-	svc.HeadlessNameBuilder.Prefix(rs.parentFSM.customResource.Name).Base("hdls").Suffix("svc").Generate()
-	svc.PingNameBuilder.Prefix(rs.parentFSM.customResource.Name).Base("ping").Suffix("svc").Generate()
-	pods.NameBuilder.Base(rs.parentFSM.customResource.Name).Suffix("container").Generate()
-	secrets.CredentialsNameBuilder.Prefix(rs.parentFSM.customResource.Name).Base("credentials").Suffix("secret").Generate()
-	secrets.ConsoleNameBuilder.Prefix(rs.parentFSM.customResource.Name).Base("console").Suffix("secret").Generate()
-	secrets.NettyNameBuilder.Prefix(rs.parentFSM.customResource.Name).Base("netty").Suffix("secret").Generate()
+	rs.parentFSM.GenerateNames()
 }
 
 // First time entering state
@@ -95,7 +85,7 @@ func (rs *CreatingK8sResourcesState) enterFromInvalidState() error {
 func (rs *CreatingK8sResourcesState) generateSecrets() *corev1.Secret {
 
 	namespacedName := types.NamespacedName{
-		Name:      secrets.CredentialsNameBuilder.Name(),
+		Name:      rs.parentFSM.GetCredentialsSecretName(),
 		Namespace: rs.namespacedName.Namespace,
 	}
 	stringDataMap := map[string]string{
@@ -106,7 +96,7 @@ func (rs *CreatingK8sResourcesState) generateSecrets() *corev1.Secret {
 	}
 	secretDefinition := secrets.Create(rs.parentFSM.customResource, namespacedName, stringDataMap, rs.parentFSM.r.client, rs.parentFSM.r.scheme)
 
-	namespacedName.Name = secrets.NettyNameBuilder.Name()
+	namespacedName.Name = rs.parentFSM.GetNettySecretName()
 	nettyDataMap := map[string]string{
 		"AMQ_ACCEPTORS":  "",
 		"AMQ_CONNECTORS": "",
@@ -150,7 +140,7 @@ func (rs *CreatingK8sResourcesState) Update() (error, int) {
 	var nextStateID int = CreatingK8sResourcesID
 
 	currentStatefulSet := &appsv1.StatefulSet{}
-	ssNamespacedName := types.NamespacedName{Name: ss.NameBuilder.Name(), Namespace: rs.parentFSM.customResource.Namespace}
+	ssNamespacedName := types.NamespacedName{Name: rs.parentFSM.GetStatefulSetName(), Namespace: rs.parentFSM.customResource.Namespace}
 	err = rs.parentFSM.r.client.Get(context.TODO(), ssNamespacedName, currentStatefulSet)
 	for {
 		if err != nil && errors.IsNotFound(err) {

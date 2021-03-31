@@ -1772,6 +1772,8 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM) corev1.PodTemplateSpec {
 
 	pts.Spec = Spec
 
+	log.Info("Final Pod spec", "detail", pts)
+
 	return pts
 }
 
@@ -1857,6 +1859,7 @@ func NewStatefulSetForCR(fsm *ActiveMQArtemisFSM) *appsv1.StatefulSet {
 	}
 	ss.Spec = Spec
 
+	log.Info("Made a ss", "ss", ss)
 	return ss
 }
 

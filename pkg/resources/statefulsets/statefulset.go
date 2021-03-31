@@ -40,6 +40,7 @@ func MakeStatefulSet(ssName string, svcHeadlessName string, namespacedName types
 		Template: pts,
 	}
 
+	log.Info("created statefulset", "spec", Spec)
 	return ss, Spec
 }
 

@@ -261,8 +261,10 @@ func getPodBrokers(instance *AddressDeployment, request reconcile.Request, clien
 
 	var ssNames []types.NamespacedName = v2alpha4.GetDeployedStatefuleSetNames(targetCrNamespacedNames)
 
-	for _, ssNamespacedName := range ssNames {
-		log.Info("retriving ss by name", "ssName", ssNamespacedName)
+	log.Info("got taget ssNames from broker controller", "ssNames", ssNames)
+
+	for n, ssNamespacedName := range ssNames {
+		log.Info("Now retrieve ss", "order", n, "ssName", ssNamespacedName)
 		statefulset, err := ss.RetrieveStatefulSet(ssNamespacedName.Name, ssNamespacedName, client)
 		if nil != err {
 			reqLogger.Error(err, "error retriving ss")
@@ -278,10 +280,11 @@ func getPodBrokers(instance *AddressDeployment, request reconcile.Request, clien
 			// For each of the replicas
 			var i int = 0
 			var replicas int = int(*statefulset.Spec.Replicas)
-			artemisArray = make([]*mgmt.Artemis, 0, replicas)
+			log.Info("finding pods in ss", "replicas", replicas)
 			for i = 0; i < replicas; i++ {
 				s := statefulset.Name + "-" + strconv.Itoa(i)
 				podNamespacedName.Name = s
+				log.Info("Trying finding pod " + s)
 				if err = client.Get(context.TODO(), podNamespacedName, pod); err != nil {
 					if errors.IsNotFound(err) {
 						reqLogger.Error(err, "Pod IsNotFound", "Namespace", request.Namespace, "Name", request.Name)
@@ -326,6 +329,7 @@ func getPodBrokers(instance *AddressDeployment, request reconcile.Request, clien
 		}
 	}
 
+	log.Info("Finally we gathered some mgmt arry", "size", len(artemisArray))
 	return artemisArray
 }
 

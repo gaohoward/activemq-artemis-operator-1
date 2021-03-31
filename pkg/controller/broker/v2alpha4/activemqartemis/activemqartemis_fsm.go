@@ -74,7 +74,31 @@ type ActiveMQArtemisFSM struct {
 	customResource     *brokerv2alpha4.ActiveMQArtemis
 	prevCustomResource *brokerv2alpha4.ActiveMQArtemis
 	r                  *ReconcileActiveMQArtemis
-	namers             Namers
+	namers             *Namers
+}
+
+func (amqbfsm *ActiveMQArtemisFSM) MakeNamers() *Namers {
+	newNamers := Namers{
+		SsGlobalName:                  "",
+		SsNameBuilder:                 namer.NamerData{},
+		SvcHeadlessNameBuilder:        namer.NamerData{},
+		SvcPingNameBuilder:            namer.NamerData{},
+		PodsNameBuilder:               namer.NamerData{},
+		SecretsCredentialsNameBuilder: namer.NamerData{},
+		SecretsConsoleNameBuilder:     namer.NamerData{},
+		SecretsNettyNameBuilder:       namer.NamerData{},
+	}
+	newNamers.SsNameBuilder.Base(amqbfsm.customResource.Name).Suffix("ss").Generate()
+	newNamers.SsGlobalName = amqbfsm.customResource.Name
+	newNamers.SvcHeadlessNameBuilder.Prefix(amqbfsm.customResource.Name).Base("hdls").Suffix("svc").Generate()
+	newNamers.SvcPingNameBuilder.Prefix(amqbfsm.customResource.Name).Base("ping").Suffix("svc").Generate()
+	newNamers.PodsNameBuilder.Base(amqbfsm.customResource.Name).Suffix("container").Generate()
+	newNamers.SecretsCredentialsNameBuilder.Prefix(amqbfsm.customResource.Name).Base("credentials").Suffix("secret").Generate()
+	newNamers.SecretsConsoleNameBuilder.Prefix(amqbfsm.customResource.Name).Base("console").Suffix("secret").Generate()
+	newNamers.SecretsNettyNameBuilder.Prefix(amqbfsm.customResource.Name).Base("netty").Suffix("secret").Generate()
+
+	log.Info("mmmm all namers in fsm generated!", "ssbuild", newNamers.SsNameBuilder.Name())
+	return &newNamers
 }
 
 // Need to deep-copy the instance?
@@ -92,16 +116,7 @@ func MakeActiveMQArtemisFSM(instance *brokerv2alpha4.ActiveMQArtemis, _namespace
 	amqbfsm.customResource = instance
 	amqbfsm.prevCustomResource = &brokerv2alpha4.ActiveMQArtemis{}
 	amqbfsm.r = r
-	amqbfsm.namers = Namers{
-		SsGlobalName:                  "",
-		SsNameBuilder:                 namer.NamerData{},
-		SvcHeadlessNameBuilder:        namer.NamerData{},
-		SvcPingNameBuilder:            namer.NamerData{},
-		PodsNameBuilder:               namer.NamerData{},
-		SecretsCredentialsNameBuilder: namer.NamerData{},
-		SecretsConsoleNameBuilder:     namer.NamerData{},
-		SecretsNettyNameBuilder:       namer.NamerData{},
-	}
+	amqbfsm.namers = amqbfsm.MakeNamers()
 
 	// TODO: Fix disconnect here between passing the parent and being added later as adding implies parenthood
 	creatingK8sResourceState := MakeCreatingK8sResourcesState(&amqbfsm, _namespacedName)
@@ -131,15 +146,6 @@ func (amqbfsm *ActiveMQArtemisFSM) Add(s *fsm.IState) {
 }
 
 func (amqbfsm *ActiveMQArtemisFSM) GenerateNames() {
-	amqbfsm.namers.SsNameBuilder.Base(amqbfsm.customResource.Name).Suffix("ss").Generate()
-	amqbfsm.namers.SsGlobalName = amqbfsm.customResource.Name
-	amqbfsm.namers.SvcHeadlessNameBuilder.Prefix(amqbfsm.customResource.Name).Base("hdls").Suffix("svc").Generate()
-	amqbfsm.namers.SvcPingNameBuilder.Prefix(amqbfsm.customResource.Name).Base("ping").Suffix("svc").Generate()
-	amqbfsm.namers.PodsNameBuilder.Base(amqbfsm.customResource.Name).Suffix("container").Generate()
-	amqbfsm.namers.SecretsCredentialsNameBuilder.Prefix(amqbfsm.customResource.Name).Base("credentials").Suffix("secret").Generate()
-	amqbfsm.namers.SecretsConsoleNameBuilder.Prefix(amqbfsm.customResource.Name).Base("console").Suffix("secret").Generate()
-	amqbfsm.namers.SecretsNettyNameBuilder.Prefix(amqbfsm.customResource.Name).Base("netty").Suffix("secret").Generate()
-	log.Info("mmmm all namers in fsm generated!", "ssbuild", amqbfsm.namers.SsNameBuilder.Name())
 }
 
 func (amqbfsm *ActiveMQArtemisFSM) Remove(s *fsm.IState) {

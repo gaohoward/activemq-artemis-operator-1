@@ -382,6 +382,10 @@ func createTargetCrNamespacedNames(namespace string, targetCrNames []string) []t
 			Namespace: namespace,
 			Name:      crName,
 		})
+		if crName == "" || crName == "*" {
+			log.Info("Found empty or * in target crName, return nil for all")
+			return nil
+		}
 	}
 	return result
 }

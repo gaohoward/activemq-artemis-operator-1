@@ -35,7 +35,7 @@ var (
 	localOnly  bool
 )
 
-var StopCh chan struct{}
+var controllers map[string]*draincontroller.Controller = make(map[string]*draincontroller.Controller)
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -126,9 +126,6 @@ func (r *ReconcileActiveMQArtemisScaledown) Reconcile(request reconcile.Request)
 	reqLogger.Info("====", "namespace:", namespace)
 	reqLogger.Info("====", "localOnly:", localOnly)
 
-	// set up signals so we handle the first shutdown signal gracefully
-	StopCh = make(chan struct{})
-
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
 		reqLogger.Error(err, "Error building kubeconfig: %s", err.Error())
@@ -161,16 +158,24 @@ func (r *ReconcileActiveMQArtemisScaledown) Reconcile(request reconcile.Request)
 	reqLogger.Info("==== new drain controller...")
 	drainControllerInstance := draincontroller.NewController(kubeClient, kubeInformerFactory, namespace, localOnly, instance.Annotations)
 
-	reqLogger.Info("==== Starting async factory...")
-	go kubeInformerFactory.Start(StopCh)
+	controllers[instance.Annotations["CRNAME"]] = drainControllerInstance
 
-	reqLogger.Info("==== Running drain controller...")
-	if err = drainControllerInstance.Run(1, StopCh); err != nil {
-		reqLogger.Info("===== failed to run drainer", "error", err.Error())
-		reqLogger.Error(err, "Error running controller: %s", err.Error())
-		return reconcile.Result{}, err
-	}
+	reqLogger.Info("==== Starting async factory...")
+	go kubeInformerFactory.Start(*drainControllerInstance.GetStopCh())
+
+	reqLogger.Info("==== Running drain controller async so multiple controllers can run...")
+	go runDrainController(drainControllerInstance)
 
 	reqLogger.Info("==== OK, return result")
 	return reconcile.Result{}, nil
+}
+
+func runDrainController(controller *draincontroller.Controller) {
+	if err := controller.Run(1); err != nil {
+		log.Error(err, "Error running controller: %s", err.Error())
+	}
+}
+
+func ReleaseController(brokerCRName string) {
+
 }

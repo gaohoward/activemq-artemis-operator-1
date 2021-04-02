@@ -230,6 +230,7 @@ func (reconciler *ActiveMQArtemisReconciler) ProcessDeploymentPlan(fsm *ActiveMQ
 
 	deploymentPlan := &fsm.customResource.Spec.DeploymentPlan
 
+	log.Info("Processing deployment plan", "plan", deploymentPlan, "broker cr", fsm.customResource.Name)
 	// Ensure the StatefulSet size is the same as the spec
 	if *currentStatefulSet.Spec.Replicas != deploymentPlan.Size {
 		currentStatefulSet.Spec.Replicas = &deploymentPlan.Size
@@ -258,6 +259,8 @@ func (reconciler *ActiveMQArtemisReconciler) ProcessDeploymentPlan(fsm *ActiveMQ
 		environments.Update(currentStatefulSet.Spec.Template.Spec.Containers, updatedEnvVar)
 		reconciler.statefulSetUpdates |= statefulSetRequireLoginUpdated
 	}
+
+	log.Info("Not sync Message migration", "for cr", fsm.customResource.Name)
 
 	syncMessageMigration(fsm.customResource, client, scheme)
 
@@ -392,15 +395,19 @@ func syncMessageMigration(customResource *brokerv2alpha4.ActiveMQArtemis, client
 	}
 
 	if *customResource.Spec.DeploymentPlan.MessageMigration {
+		log.Info("we need scaledown for this cr", "crName", customResource.Name, "scheme", scheme)
 		if err = resources.Retrieve(namespacedName, client, scaledown); err != nil {
 			// err means not found so create
 			log.Info("Creating builtin drainer CR ", "scaledown", scaledown)
 			if retrieveError = resources.Create(customResource, namespacedName, client, scheme, scaledown); retrieveError == nil {
+				log.Info("drainer created successfully", "drainer", scaledown)
+			} else {
+				log.Error(retrieveError, "we have error retrieving drainer", "drainer", scaledown, "scheme", scheme)
 			}
 		}
 	} else {
 		if err = resources.Retrieve(namespacedName, client, scaledown); err == nil {
-			close(activemqartemisscaledown.StopCh)
+			activemqartemisscaledown.ReleaseController(customResource.Name)
 			// err means not found so delete
 			if retrieveError = resources.Delete(namespacedName, client, scaledown); retrieveError == nil {
 			}

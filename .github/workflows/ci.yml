@@ -22,6 +22,9 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@v2
 
+      - name: Show checkout content
+        run: ls ${{ github.workspace }}
+
       - name: Execute the tests
         run: go get github.com/onsi/ginkgo/ginkgo && $(go env GOPATH)/bin/ginkgo ./...
 

@@ -111,6 +111,16 @@ type DeploymentPlanType struct {
 	JolokiaAgentEnabled   bool                        `json:"jolokiaAgentEnabled,omitempty"`
 	ManagementRBACEnabled bool                        `json:"managementRBACEnabled,omitempty"`
 	ExtraMounts           ExtraMountsType             `json:"extraMounts,omitempty"`
+	LivenessProbe         LivenessProbeType           `json:"livenessProbe,omitempty"`
+	ReadinessProbe        ReadinessProbeType          `json:"readinessProbe,omitempty"`
+}
+
+type LivenessProbeType struct {
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+}
+
+type ReadinessProbeType struct {
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
 }
 
 type ExtraMountsType struct {

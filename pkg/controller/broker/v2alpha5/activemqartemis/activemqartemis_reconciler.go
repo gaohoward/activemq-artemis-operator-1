@@ -1594,6 +1594,15 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 	}
 	reqLogger.V(1).Info("now mounts added to container", "new len", len(container.VolumeMounts))
 
+	if customResource.Spec.DeploymentPlan.LivenessProbe.TimeoutSeconds != nil {
+		container.LivenessProbe.TimeoutSeconds = *customResource.Spec.DeploymentPlan.LivenessProbe.TimeoutSeconds
+		reqLogger.V(1).Info("Setting liveness timeoutSeconds", "value", container.LivenessProbe.TimeoutSeconds)
+	}
+	reqLogger.V(1).Info("Checking out readiness", "crvalue", customResource.Spec.DeploymentPlan.ReadinessProbe.TimeoutSeconds)
+	if customResource.Spec.DeploymentPlan.ReadinessProbe.TimeoutSeconds != nil {
+		container.ReadinessProbe.TimeoutSeconds = *customResource.Spec.DeploymentPlan.ReadinessProbe.TimeoutSeconds
+		reqLogger.V(1).Info("Setting readiness timeoutSeconds", "value", container.ReadinessProbe.TimeoutSeconds)
+	}
 	Spec.Containers = append(Containers, container)
 	brokerVolumes := MakeVolumes(customResource)
 	if len(extraVolumes) > 0 {

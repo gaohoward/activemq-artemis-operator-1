@@ -151,11 +151,21 @@ func (reconciler *ActiveMQArtemisReconciler) ProcessStatefulSet(fsm *ActiveMQArt
 
 	headlessServiceDefinition := svc.NewHeadlessServiceForCR(ssNamespacedName, serviceports.GetDefaultPorts())
 	labels := selectors.LabelBuilder.Labels()
-	pingServiceDefinition := svc.NewPingServiceDefinitionForCR(ssNamespacedName, labels, labels)
+
+	if isClustered(fsm.customResource) {
+		pingServiceDefinition := svc.NewPingServiceDefinitionForCR(ssNamespacedName, labels, labels)
+		requestedResources = append(requestedResources, pingServiceDefinition)
+	}
 	requestedResources = append(requestedResources, headlessServiceDefinition)
-	requestedResources = append(requestedResources, pingServiceDefinition)
 
 	return currentStatefulSet, firstTime
+}
+
+func isClustered(customResource *brokerv2alpha5.ActiveMQArtemis) bool {
+	if customResource.Spec.DeploymentPlan.Clustered != nil {
+		return *customResource.Spec.DeploymentPlan.Clustered
+	}
+	return true
 }
 
 func (reconciler *ActiveMQArtemisReconciler) ProcessCredentials(customResource *brokerv2alpha5.ActiveMQArtemis, client client.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint32 {
@@ -259,6 +269,11 @@ func (reconciler *ActiveMQArtemisReconciler) ProcessDeploymentPlan(customResourc
 	if updatedEnvVar := environments.BoolSyncCausedUpdateOn(currentStatefulSet.Spec.Template.Spec.Containers, "AMQ_REQUIRE_LOGIN", deploymentPlan.RequireLogin); updatedEnvVar != nil {
 		environments.Update(currentStatefulSet.Spec.Template.Spec.Containers, updatedEnvVar)
 		reconciler.statefulSetUpdates |= statefulSetRequireLoginUpdated
+	}
+
+	if clusterSyncCausedUpdateOn(deploymentPlan, currentStatefulSet) {
+		log.Info("Clustered is false")
+		reconciler.statefulSetUpdates |= statefulSetClusterConfigUpdated
 	}
 
 	syncMessageMigration(customResource, client, scheme)
@@ -381,7 +396,10 @@ func syncMessageMigration(customResource *brokerv2alpha5.ActiveMQArtemis, client
 		customResource.Spec.DeploymentPlan.MessageMigration = &defaultMessageMigration
 	}
 
-	if *customResource.Spec.DeploymentPlan.MessageMigration {
+	clustered := isClustered(customResource)
+
+	if *customResource.Spec.DeploymentPlan.MessageMigration && clustered {
+		log.Info("Creating scaledown controller")
 		if err = resources.Retrieve(namespacedName, client, scaledown); err != nil {
 			// err means not found so create
 			if retrieveError = resources.Create(customResource, namespacedName, client, scheme, scaledown); retrieveError == nil {
@@ -1203,6 +1221,34 @@ func initImageSyncCausedUpdateOn(customResource *brokerv2alpha5.ActiveMQArtemis,
 	}
 
 	return false
+}
+
+func clusterSyncCausedUpdateOn(deploymentPlan *brokerv2alpha5.DeploymentPlanType, currentStatefulSet *appsv1.StatefulSet) bool {
+
+	isClustered := true
+	if deploymentPlan.Clustered != nil {
+		isClustered = *deploymentPlan.Clustered
+	}
+
+	//we are only interested in non-cluster case
+	//as elsewhere in the code it's been treated as clustered.
+	if !isClustered {
+
+		brokerContainers := []*corev1.Container{
+			&currentStatefulSet.Spec.Template.Spec.InitContainers[0],
+			&currentStatefulSet.Spec.Template.Spec.Containers[0],
+		}
+
+		for _, container := range brokerContainers {
+			for j, envVar := range container.Env {
+				if "AMQ_CLUSTERED" == envVar.Name {
+					container.Env[j].Value = "false"
+					log.Info("Setting clustered env to false", "envs", container.Env)
+				}
+			}
+		}
+	}
+	return !isClustered
 }
 
 func (reconciler *ActiveMQArtemisReconciler) ProcessResources(customResource *brokerv2alpha5.ActiveMQArtemis, client client.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint8 {

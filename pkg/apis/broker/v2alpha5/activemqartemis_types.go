@@ -111,6 +111,12 @@ type DeploymentPlanType struct {
 	JolokiaAgentEnabled   bool                        `json:"jolokiaAgentEnabled,omitempty"`
 	ManagementRBACEnabled bool                        `json:"managementRBACEnabled,omitempty"`
 	ExtraMounts           ExtraMountsType             `json:"extraMounts,omitempty"`
+	PodSecurity           PodSecurityType             `json:"podSecurity,omitempty"`
+}
+
+type PodSecurityType struct {
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
+	RunAsUser          *int64  `json:"runAsUser,omitempty"`
 }
 
 type ExtraMountsType struct {

@@ -316,6 +316,7 @@ func (reconciler *ActiveMQArtemisReconciler) ProcessAcceptorsAndConnectors(custo
 		"AMQ_CONNECTORS": connectorEntry,
 	}
 	secretName := secrets.NettyNameBuilder.Name()
+	log.Info("set acceptor and connector env and store in secret", "secret", secretName)
 	retVal = sourceEnvVarFromSecret(customResource, currentStatefulSet, &envVars, secretName, client, scheme)
 
 	return retVal
@@ -612,9 +613,13 @@ func generateAcceptorsString(customResource *brokerv2alpha5.ActiveMQArtemis, cli
 		}
 		if acceptor.SSLEnabled {
 			secretName := customResource.Name + "-" + acceptor.Name + "-secret"
+			log.Info("Acceptor is sslenabled", "secret", secretName)
 			if "" != acceptor.SSLSecret {
+				log.Info("User specified sslsecretName", "secretName", secretName)
 				secretName = acceptor.SSLSecret
 			}
+			log.Info("Effect ssl secret", "name", secretName)
+			generateSSLSecretIfNotExist(secretName)
 			acceptorEntry = acceptorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, client, secretName)
 			sslOptionalArguments := generateAcceptorSSLOptionalArguments(acceptor)
 			if "" != sslOptionalArguments {
@@ -653,7 +658,12 @@ func generateAcceptorsString(customResource *brokerv2alpha5.ActiveMQArtemis, cli
 		acceptorEntry = acceptorEntry + "<\\/acceptor>"
 	}
 
+	log.Info("created accteptor entry", "value", acceptorEntry)
 	return acceptorEntry
+}
+
+func generateSSLSecretIfNotExist(secretName string) {
+
 }
 
 func generateConnectorsString(customResource *brokerv2alpha5.ActiveMQArtemis, client client.Client) string {
@@ -911,6 +921,7 @@ func generateConsoleSSLFlags(customResource *brokerv2alpha5.ActiveMQArtemis, cli
 
 func generateAcceptorConnectorSSLArguments(customResource *brokerv2alpha5.ActiveMQArtemis, client client.Client, secretName string) string {
 
+	log.Info("Findinng SSL values in secret", "secretName", secretName)
 	sslArguments := "sslEnabled=true"
 	secretNamespacedName := types.NamespacedName{
 		Name:      secretName,
@@ -928,19 +939,24 @@ func generateAcceptorConnectorSSLArguments(customResource *brokerv2alpha5.Active
 	trustStorePassword := "password"
 	trustStorePath := "\\/etc\\/" + secretName + "-volume\\/client.ts"
 	if err := resources.Retrieve(secretNamespacedName, client, userPasswordSecret); err == nil {
+		log.Info("Retrived the ssl secret", "from secret", secretNamespacedName, "secret values", userPasswordSecret)
 		if "" != string(userPasswordSecret.Data["keyStorePassword"]) {
+			log.Info("In ssl secret the keystorePassword is found")
 			//noinspection GoUnresolvedReference
 			keyStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePassword"]), "/", "\\/")
 		}
 		if "" != string(userPasswordSecret.Data["keyStorePath"]) {
+			log.Info("In ssl secret the keyStorePath is found")
 			//noinspection GoUnresolvedReference
 			keyStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePath"]), "/", "\\/")
 		}
 		if "" != string(userPasswordSecret.Data["trustStorePassword"]) {
+			log.Info("In ssl secret the truststorePassword is found")
 			//noinspection GoUnresolvedReference
 			trustStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePassword"]), "/", "\\/")
 		}
 		if "" != string(userPasswordSecret.Data["trustStorePath"]) {
+			log.Info("In ssl secret the truststorePath is found")
 			//noinspection GoUnresolvedReference
 			trustStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePath"]), "/", "\\/")
 		}

@@ -56,10 +56,36 @@ func MakeSecret(namespacedName types.NamespacedName, secretName string, stringDa
 	return secretDefinition
 }
 
+func MakeSecret2(namespacedName types.NamespacedName, secretName string, stringData map[string]string, binData map[string][]byte) corev1.Secret {
+
+	secretDefinition := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    selectors.LabelBuilder.Labels(),
+			Name:      secretName,
+			Namespace: namespacedName.Namespace,
+		},
+		StringData: stringData,
+		Data:       binData,
+	}
+
+	return secretDefinition
+}
+
 //func NewSecret(customResource *brokerv2alpha1.ActiveMQArtemis, secretName string, stringData map[string]string) *corev1.Secret {
 func NewSecret(namespacedName types.NamespacedName, secretName string, stringData map[string]string) *corev1.Secret {
 
 	secretDefinition := MakeSecret(namespacedName, secretName, stringData)
+
+	return &secretDefinition
+}
+
+func NewSecret2(namespacedName types.NamespacedName, secretName string, stringData map[string]string, binData map[string][]byte) *corev1.Secret {
+
+	secretDefinition := MakeSecret2(namespacedName, secretName, stringData, binData)
 
 	return &secretDefinition
 }

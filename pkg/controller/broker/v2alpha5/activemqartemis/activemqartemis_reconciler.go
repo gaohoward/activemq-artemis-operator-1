@@ -36,6 +36,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/environments"
 	svc "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/services"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/volumes"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/certs"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 
 	"reflect"
@@ -69,6 +70,13 @@ const (
 	statefulSetConnectorsUpdated = 1 << 9
 	statefulSetConsoleUpdated    = 1 << 10
 	statefulSetInitImageUpdated  = 1 << 11
+
+	KEYSTORE_PATH       = "keyStorePath"
+	KEYSTORE_PASSWORD   = "keyStorePassword"
+	KEYSTORE_NAME       = "broker.ks"
+	TRUSTSTORE_PATH     = "trustStorePath"
+	TRUSTSTORE_PASSWORD = "trustStorePassword"
+	TRUSTSTORE_NAME     = "client.ts"
 )
 
 var defaultMessageMigration bool = true
@@ -619,7 +627,7 @@ func generateAcceptorsString(customResource *brokerv2alpha5.ActiveMQArtemis, cli
 				secretName = acceptor.SSLSecret
 			}
 			log.Info("Effect ssl secret", "name", secretName)
-			generateSSLSecretIfNotExist(secretName)
+			generateSSLSecretIfNotExist(customResource, client, secretName)
 			acceptorEntry = acceptorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, client, secretName)
 			sslOptionalArguments := generateAcceptorSSLOptionalArguments(acceptor)
 			if "" != sslOptionalArguments {
@@ -662,7 +670,52 @@ func generateAcceptorsString(customResource *brokerv2alpha5.ActiveMQArtemis, cli
 	return acceptorEntry
 }
 
-func generateSSLSecretIfNotExist(secretName string) {
+func generateSSLSecretIfNotExist(customResource *brokerv2alpha5.ActiveMQArtemis, client client.Client, secretName string) {
+	secretNamespacedName := types.NamespacedName{
+		Name:      secretName,
+		Namespace: customResource.Namespace,
+	}
+	namespacedName := types.NamespacedName{
+		Name:      customResource.Name,
+		Namespace: customResource.Namespace,
+	}
+	stringData := map[string]string{}
+	binData := map[string][]byte{}
+
+	sslSecret := secrets.NewSecret2(namespacedName, secretName, stringData, binData)
+
+	log.Info("Trying to retrieve ssl secret", "secret", secretName)
+	if err := resources.Retrieve(secretNamespacedName, client, sslSecret); err != nil {
+		if errors.IsNotFound(err) {
+			//create
+			log.Info("Creating ssl secret", "name", secretName)
+			password := "changeit"
+			stringData[KEYSTORE_PASSWORD] = password
+			cert, keystoreData, err := certs.MakeSelfSignedKeyStore(password)
+			if err != nil {
+				log.Error(err, "Failed to create certificate")
+				return
+			}
+			binData[KEYSTORE_NAME] = keystoreData
+
+			stringData[TRUSTSTORE_PASSWORD] = password
+			truststoreData, err := certs.MakeSelfSignedTrustStore(cert, password)
+			if err != nil {
+				log.Error(err, "Failed to create trust store")
+				return
+			}
+			binData[TRUSTSTORE_NAME] = truststoreData
+
+			log.Info("adding new scecret", "stringData", stringData, "binData", binData)
+			newSecret := secrets.NewSecret2(secretNamespacedName, secretName, stringData, binData)
+			requestedResources = append(requestedResources, newSecret)
+
+		} else {
+			log.Error(err, "Error retriving secret", "secret", sslSecret)
+		}
+	} else {
+		log.Info("The secret already there", "secretName", secretName)
+	}
 
 }
 

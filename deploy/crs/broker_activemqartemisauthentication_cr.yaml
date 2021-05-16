@@ -1,0 +1,13 @@
+apiVersion: broker.amq.io/v1alpha1
+kind: ActiveMQArtemisAuthentication
+metadata:
+  name: ex-aaoauthentication
+spec:
+  domain:
+    name: activemq
+    loginModules:
+    - className: org.apache.activemq.artemis.spi.core.security.jaas.PropertiesLoginModule
+      flag: sufficient
+      options:
+      - debug: true
+    

@@ -1,0 +1,90 @@
+﻿kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: activemqartemisauthentications.broker.amq.io
+spec:
+  subresources:
+    status: {}
+  names:
+    plural: activemqartemisauthentications
+    singular: activemqartemisauthentication
+    kind: ActiveMQArtemisAuthentication
+    listKind: ActiveMQArtemisAuthenticationList
+  scope: Namespaced
+  conversion:
+    strategy: None
+  preserveUnknownFields: true
+  version: v1alpha1
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          type: object
+          required:
+            - domain
+          properties:
+            domain:
+              description: the domain
+              type: object
+              properties:
+                name:
+                  description: the domain name, default is activemq
+                loginModules:
+                  description: the login modules
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      className:
+                        type: string
+                      flag:
+                        type: string
+                      options:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key:
+                              type: string
+                            value:
+                              type: string
+            certDomain:
+              description: the certificate-domain. TextFileCertificateLoginModule
+              type: object
+              properties:
+                name:
+                  description: the cert domain name, default is certDomain
+                  type: string
+                debug:
+                  description: the debug flag
+                  type: boolean
+                users:
+                  description: the user accounts
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        description: the user name
+                        type: string
+                      dn:
+                        description: the valid DN name from client certificate
+                        type: string
+                      roles:
+                        description: the roles the user maps to
+                        type: array
+                        items:
+                          type: string
+        status:
+          type: object
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+  group: broker.amq.io

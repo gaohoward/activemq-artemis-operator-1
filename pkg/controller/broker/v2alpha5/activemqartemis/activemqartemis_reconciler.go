@@ -79,6 +79,7 @@ var lastStatus olm.DeploymentStatus
 // and run it if exists.
 var initHelperScript = "/opt/amq-broker/script/default.sh"
 var brokerConfigRoot = "/amq/init/config"
+var configCmd = "/opt/amq/bin/launch.sh"
 
 //default ApplyRule for address-settings
 var defApplyRule string = "merge_all"
@@ -1645,6 +1646,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 	initContainer.Command = []string{"/bin/bash"}
 	initContainer.Resources = customResource.Spec.DeploymentPlan.Resources
 
+	var initCmds []string
 	//address settings
 	addressSettings := customResource.Spec.AddressSettings.AddressSetting
 	if len(addressSettings) > 0 {
@@ -1684,11 +1686,8 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 			"/broker.yaml; cat /yacfg_etc/broker.yaml; yacfg --profile " + yacfgProfileName + "/" +
 			yacfgProfileVersion + "/default_with_user_address_settings.yaml.jinja2  --tune " +
 			outputDir + "/broker.yaml --extra-properties '" + jsonSpecials + "' --output " + outputDir
-		configCmd := "/opt/amq/bin/launch.sh"
 
-		var initArgs []string = []string{"-c", initCmd + " && " + configCmd + " && " + initHelperScript}
-
-		initContainer.Args = initArgs
+		initCmds = append(initCmds, initCmd)
 
 		//populate args of init container
 
@@ -1742,12 +1741,6 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 	} else {
 		log.Info("No addressetings")
 
-		configCmd := "/opt/amq/bin/launch.sh"
-
-		var initArgs []string
-		initArgs = []string{"-c", configCmd + " && " + initHelperScript}
-		initContainer.Args = initArgs
-
 		Spec.InitContainers = []corev1.Container{
 			initContainer,
 		}
@@ -1755,6 +1748,46 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 		volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
 		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
 	}
+
+	var initArgs []string = []string{"-c"}
+
+	//provide a way to configuration after launch.sh
+	var brokerHandlerCmds []string = []string{}
+	log.Info("Checking if there are any config handlers", "main cr", namespacedName)
+	brokerConfigHandlers := GetBrokerConfigHandler(namespacedName)
+	if len(brokerConfigHandlers) > 0 {
+		log.Info("Yes there are some handlers", "size", len(brokerConfigHandlers))
+		for _, handler := range brokerConfigHandlers {
+			log.Info("Now calling handler config", "handler", handler)
+			handlerCmds := handler.Config(&Spec.InitContainers[0])
+			log.Info("Do we get some new init commands?", "handlerCmds", handlerCmds)
+			if len(handlerCmds) > 0 {
+				log.Info("appending to initCmd array...")
+				brokerHandlerCmds = append(brokerHandlerCmds, handlerCmds...)
+			}
+		}
+	}
+
+	var strBuilder strings.Builder
+
+	isFirst := true
+	initCmds = append(initCmds, configCmd)
+	initCmds = append(initCmds, brokerHandlerCmds...)
+	initCmds = append(initCmds, initHelperScript)
+
+	for _, icmd := range initCmds {
+		if isFirst {
+			isFirst = false
+		} else {
+			strBuilder.WriteString(" && ")
+		}
+		strBuilder.WriteString(icmd)
+	}
+	initArgs = append(initArgs, strBuilder.String())
+
+	log.Info("The final init cmds to init ", "the cmd array", initArgs)
+
+	Spec.InitContainers[0].Args = initArgs
 
 	if len(extraVolumeMounts) > 0 {
 		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, extraVolumeMounts...)

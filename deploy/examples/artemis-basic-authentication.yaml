@@ -1,0 +1,32 @@
+apiVersion: broker.amq.io/v1alpha1
+kind: ActiveMQArtemisAuthentication
+metadata:
+  name: ex-aaoauthentication
+spec:
+  domain:
+    name: activemq
+    loginModules:
+    - className: org.apache.activemq.artemis.spi.core.security.jaas.PropertiesLoginModule
+      flag: sufficient
+      options:
+      - key: debug
+        value: 'true'
+      - key: "org.apache.activemq.jaas.properties.user"
+        value: "artemis-users.properties"
+      - key: "org.apache.activemq.jaas.properties.role"
+        value: "artemis-roles.properties"
+      - key: "users"
+        value: "bob,jane"
+      - key: "roles"
+        value: "admin;viewer,sender"
+      - key: "passwords"
+        value: "password,changeit"
+    - className: org.apache.activemq.artemis.spi.core.security.jaas.GuestLoginModule
+      flag: sufficient
+      options:
+      - key: debug
+        value: 'true'
+      - key: "org.apache.activemq.jaas.guest.user"
+        value: "guest"
+      - key: "org.apache.activemq.jaas.guest.role"
+        value: "restricted"

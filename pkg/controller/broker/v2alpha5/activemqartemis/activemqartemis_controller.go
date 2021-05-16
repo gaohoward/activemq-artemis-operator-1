@@ -23,6 +23,27 @@ var log = logf.Log.WithName("controller_v2alpha5activemqartemis")
 
 var namespacedNameToFSM = make(map[types.NamespacedName]*ActiveMQArtemisFSM)
 
+type ActiveMQArtemisConfigHandler interface {
+	Config(initContainer *corev1.Container) (value []string)
+}
+
+var namespaceToConfigHandler = make(map[string][]ActiveMQArtemisConfigHandler)
+
+func GetBrokerConfigHandler(namespacedName types.NamespacedName) (handlers []ActiveMQArtemisConfigHandler) {
+	value, _ := namespaceToConfigHandler[namespacedName.Namespace]
+	return value
+}
+
+func AddBrokerConfigHandler(namespacedName types.NamespacedName, handler ActiveMQArtemisConfigHandler) {
+	handlers, exist := namespaceToConfigHandler[namespacedName.Namespace]
+	if !exist {
+		handlers = make([]ActiveMQArtemisConfigHandler, 0)
+	}
+	handlers = append(handlers, handler)
+	namespaceToConfigHandler[namespacedName.Namespace] = handlers
+	log.Info("A config handler has been added", "new handler", handler)
+}
+
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
 * business logic.  Delete these comments after modifying this file.*

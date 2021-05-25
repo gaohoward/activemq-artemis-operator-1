@@ -285,7 +285,7 @@ spec:
                       connectionUserName:
                         type: string
                       connectionPassword:
-                        type:string
+                        type: string
                       saslLoginConfigScope:
                         type: string
                       connectionProtocol:

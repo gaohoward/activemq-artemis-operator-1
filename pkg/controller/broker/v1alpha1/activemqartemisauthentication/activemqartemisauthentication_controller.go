@@ -5,6 +5,8 @@ import (
 
 	brokerv1alpha1 "github.com/artemiscloud/activemq-artemis-operator/pkg/apis/broker/v1alpha1"
 	v2alpha5 "github.com/artemiscloud/activemq-artemis-operator/pkg/controller/broker/v2alpha5/activemqartemis"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/environments"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -76,7 +78,35 @@ type ActiveMQArtemisAuthenticationConfigHandler struct {
 	AuthenticationCR *brokerv1alpha1.ActiveMQArtemisAuthentication
 }
 
-func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainer *corev1.Container) (value []string) {
+func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainer *corev1.Container, outputDir string) (value []string) {
 	log.Info("Reconciling authentication", "cr", r.AuthenticationCR)
-	return []string{"echo hello", "ls"}
+	var configCmds = []string{"echo \"making dir " + outputDir + "\"", "mkdir -p " + outputDir}
+	filePath := outputDir + "/security-config.yaml"
+	cmdPersistCRAsYaml, err := r.persistCR(filePath)
+	if err != nil {
+		log.Error(err, "Error marshalling authentication CR", "cr", r.AuthenticationCR)
+		return nil
+	}
+	log.Info("get the command", "value", cmdPersistCRAsYaml)
+	configCmds = append(configCmds, cmdPersistCRAsYaml)
+	configCmds = append(configCmds, "/opt/amq-broker/script/cfg/authentication.sh")
+	//export env var SECURITY_CFG_YAML
+	envVarName := "SECURITY_CFG_YAML"
+	envVar := corev1.EnvVar{
+		envVarName,
+		filePath,
+		nil,
+	}
+	environments.Create([]corev1.Container{*initContainer}, &envVar)
+
+	return configCmds
+}
+
+func (r *ActiveMQArtemisAuthenticationConfigHandler) persistCR(filePath string) (value string, err error) {
+
+	data, err := yaml.Marshal(r.AuthenticationCR)
+	if err != nil {
+		return "", err
+	}
+	return "echo \"" + string(data) + "\" > " + filePath, nil
 }

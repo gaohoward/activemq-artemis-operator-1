@@ -1,0 +1,29 @@
+apiVersion: broker.amq.io/v1alpha1
+kind: ActiveMQArtemisAuthentication
+metadata:
+  name: ex-aaoauthen2
+spec:
+  loginModules:
+    propertiesLoginModules
+    - name: 'module1'
+      users:
+      - name: 'user1'
+        password: 'password1'
+        roles:
+        - 'role1'
+        - 'role2'
+      - name: 'user2'
+        password: 'password2'
+        roles:
+        - 'role3'
+        - 'role1'
+  securityDomains:
+    brokerDomain:
+      name: 'activemqx'
+      loginModules:
+      - name: 'module1'
+        flag: 'required'
+        debug: true
+        reload: true
+
+

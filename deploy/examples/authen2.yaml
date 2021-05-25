@@ -1,0 +1,21 @@
+apiVersion: broker.amq.io/v1alpha1
+kind: ActiveMQArtemisAuthentication
+metadata:
+  name: ex-aaoauthen2
+spec:
+  securityDomains:
+    brokerDomain: 'activemqx'
+  loginModules:
+  - name: 'org.apache.activemq.artemis.spi.core.security.jaas.PropertiesLoginModule'
+    flag: 'sufficient'
+    domains:
+    - broker
+    options:
+    - key: 'debug'
+      value: 'true'
+    - key: 'users'
+      Value: 'jane,bob'
+    - key: 'roles'
+      Value: 'guest,viewer'
+    - key: 'passwords'
+      valueFromSecret: 'mysecret'

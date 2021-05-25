@@ -13,7 +13,7 @@ type ActiveMQArtemisAuthenticationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
-	LoginModules     LoginModulesType     `json:"loginModulesType"`
+	LoginModules     LoginModulesType     `json:"loginModules"`
 	SecurityDomains  SecurityDomainsType  `json:"securityDomains"`
 	SecuritySettings SecuritySettingsType `json:"securitySettings"`
 }

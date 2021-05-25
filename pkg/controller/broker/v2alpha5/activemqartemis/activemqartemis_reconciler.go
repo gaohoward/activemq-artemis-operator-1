@@ -1758,7 +1758,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 		log.Info("Yes there are some handlers", "size", len(brokerConfigHandlers))
 		for _, handler := range brokerConfigHandlers {
 			log.Info("Now calling handler config", "handler", handler)
-			handlerCmds := handler.Config(&Spec.InitContainers[0], initCfgRootDir+"/authentication")
+			handlerCmds := handler.Config(Spec.InitContainers, initCfgRootDir+"/authentication")
 			log.Info("Do we get some new init commands?", "handlerCmds", handlerCmds)
 			if len(handlerCmds) > 0 {
 				log.Info("appending to initCmd array...")

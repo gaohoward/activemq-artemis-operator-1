@@ -78,7 +78,7 @@ type ActiveMQArtemisAuthenticationConfigHandler struct {
 	AuthenticationCR *brokerv1alpha1.ActiveMQArtemisAuthentication
 }
 
-func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainer *corev1.Container, outputDir string) (value []string) {
+func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainers []corev1.Container, outputDir string) (value []string) {
 	log.Info("Reconciling authentication", "cr", r.AuthenticationCR)
 	var configCmds = []string{"echo \"making dir " + outputDir + "\"", "mkdir -p " + outputDir}
 	filePath := outputDir + "/security-config.yaml"
@@ -97,7 +97,7 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainer *corev
 		filePath,
 		nil,
 	}
-	environments.Create([]corev1.Container{*initContainer}, &envVar)
+	environments.Create(initContainers, &envVar)
 
 	return configCmds
 }

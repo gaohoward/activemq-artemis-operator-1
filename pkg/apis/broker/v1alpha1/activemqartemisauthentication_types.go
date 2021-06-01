@@ -246,12 +246,12 @@ type ConnectorConfigType struct {
 }
 
 type AuthorisationConfigType struct {
-	WhiteList     []WhiteListEntryType `json:"whiteList,omitempty"`
+	Whitelist     []WhitelistEntryType `json:"whitelist,omitempty"`
 	DefaultAccess []DefaultAccessType  `json:"defaultAccess,omitempty"`
 	RoleAccess    []RoleAccessType     `json:"roleAccess,omitempty"`
 }
 
-type WhiteListEntryType struct {
+type WhitelistEntryType struct {
 	Domain *string `json:"domain,omitempty"`
 	Key    *string `json:"key,omitempty"`
 }

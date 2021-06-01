@@ -410,21 +410,23 @@ spec:
               properties:
                 broker:
                   description: security settings in broker.xml
-                  type: object
-                  properties:
-                    match:
-                      type: string
-                    permissions:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          operationType:
-                            type: string
-                          roles:
-                            type: array
-                            items:
-                              type: string  
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      match:
+                        type: string
+                      permissions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            operationType:
+                              type: string
+                            roles:
+                              type: array
+                              items:
+                                type: string  
                 management:
                   description: management api access control
                   type: object

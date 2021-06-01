@@ -209,23 +209,23 @@ type CertDomainType struct {
 }
 
 type SecuritySettingsType struct {
-	Broker     BrokerSecuritySettingsType     `json:"broker,omitempty"`
+	Broker     []BrokerSecuritySettingType    `json:"broker,omitempty"`
 	Management ManagementSecuritySettingsType `json:"management,omitempty"`
 }
 
-type BrokerSecuritySettingsType struct {
+type BrokerSecuritySettingType struct {
 	Match       string           `json:"match,omitempty"`
 	Permissions []PermissionType `json:"permissions,omitempty"`
 }
 
 type PermissionType struct {
-	OperationType string `json:"operationType"`
-	Roles         string `json:"roles,omitempty"`
+	OperationType string   `json:"operationType"`
+	Roles         []string `json:"roles,omitempty"`
 }
 
 type ManagementSecuritySettingsType struct {
 	Connector     ConnectorConfigType     `json:"connector,omitempty"`
-	Authorization AuthorizationConfigType `json:"authorization,omitempty"`
+	Authorisation AuthorisationConfigType `json:"authorisation,omitempty"`
 }
 
 type ConnectorConfigType struct {
@@ -245,7 +245,7 @@ type ConnectorConfigType struct {
 	PasswordCodec      *string `json:"passwordCodec,omitempty"`
 }
 
-type AuthorizationConfigType struct {
+type AuthorisationConfigType struct {
 	WhiteList     []WhiteListEntryType `json:"whiteList,omitempty"`
 	DefaultAccess []DefaultAccessType  `json:"defaultAccess,omitempty"`
 	RoleAccess    []RoleAccessType     `json:"roleAccess,omitempty"`

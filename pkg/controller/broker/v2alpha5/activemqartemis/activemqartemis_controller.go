@@ -24,7 +24,7 @@ var log = logf.Log.WithName("controller_v2alpha5activemqartemis")
 var namespacedNameToFSM = make(map[types.NamespacedName]*ActiveMQArtemisFSM)
 
 type ActiveMQArtemisConfigHandler interface {
-	Config(initContainers []corev1.Container, outputDir string) (value []string)
+	Config(initContainers []corev1.Container, outputDirRoot string, yacfgProfileVersion string, yacfgProfileName string) (value []string)
 }
 
 var namespaceToConfigHandler = make(map[string][]ActiveMQArtemisConfigHandler)

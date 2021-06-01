@@ -1649,6 +1649,10 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 	var initCmds []string
 	var initCfgRootDir = "/init_cfg_root"
 
+	compactVersionToUse := determineCompactVersionToUse(customResource)
+	yacfgProfileVersion = version.FullVersionFromCompactVersion[compactVersionToUse]
+	yacfgProfileName := version.YacfgProfileName
+
 	//address settings
 	addressSettings := customResource.Spec.AddressSettings.AddressSetting
 	if len(addressSettings) > 0 {
@@ -1680,15 +1684,12 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 		envVarTuneFilePath := "TUNE_PATH"
 		outputDir := initCfgRootDir + "/yacfg_etc"
 
-		compactVersionToUse := determineCompactVersionToUse(customResource)
-		yacfgProfileVersion = version.FullVersionFromCompactVersion[compactVersionToUse]
-		yacfgProfileName := version.YacfgProfileName
-
 		initCmd := "mkdir -p " + outputDir + "; echo \"" + configYaml.String() + "\" > " + outputDir +
-			"/broker.yaml; cat /yacfg_etc/broker.yaml; yacfg --profile " + yacfgProfileName + "/" +
+			"/broker.yaml; cat " + outputDir + "/broker.yaml; yacfg --profile " + yacfgProfileName + "/" +
 			yacfgProfileVersion + "/default_with_user_address_settings.yaml.jinja2  --tune " +
 			outputDir + "/broker.yaml --extra-properties '" + jsonSpecials + "' --output " + outputDir
 
+		log.Info("==debug==, initCmd: " + initCmd)
 		initCmds = append(initCmds, initCmd)
 
 		//populate args of init container
@@ -1758,7 +1759,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 		log.Info("Yes there are some handlers", "size", len(brokerConfigHandlers))
 		for _, handler := range brokerConfigHandlers {
 			log.Info("Now calling handler config", "handler", handler)
-			handlerCmds := handler.Config(Spec.InitContainers, initCfgRootDir+"/authentication")
+			handlerCmds := handler.Config(Spec.InitContainers, initCfgRootDir+"/authentication", yacfgProfileVersion, yacfgProfileName)
 			log.Info("Do we get some new init commands?", "handlerCmds", handlerCmds)
 			if len(handlerCmds) > 0 {
 				log.Info("appending to initCmd array...")

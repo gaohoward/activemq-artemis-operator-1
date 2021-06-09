@@ -1558,6 +1558,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 	pts := pods.MakePodTemplateSpec(namespacedName, selectors.LabelBuilder.Labels())
 	Spec := corev1.PodSpec{}
 	Containers := []corev1.Container{}
+	Spec.InitContainers = []corev1.Container{}
 
 	imageName := ""
 	if "placeholder" == customResource.Spec.DeploymentPlan.Image {
@@ -1615,8 +1616,10 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 	volumeMountForCfg := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
 	Spec.Containers[0].VolumeMounts = append(Spec.Containers[0].VolumeMounts, volumeMountForCfg)
 
+	// TODO: Refactor the container and the init container sections to exist in separate functions
 	log.Info("Creating init container for broker configuration")
-	initContainer := containers.MakeInitContainer("", "", MakeEnvVarArrayForCR(customResource))
+	//initContainer := containers.MakeInitContainer("", "", MakeEnvVarArrayForCR(customResource))
+	Spec.InitContainers[0] = containers.MakeInitContainer("", "", MakeEnvVarArrayForCR(customResource))
 
 	initImageName := ""
 	if "placeholder" == customResource.Spec.DeploymentPlan.InitImage ||
@@ -1629,10 +1632,35 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 	}
 	reqLogger.V(1).Info("NewPodTemplateSpecForCR determined initImage to use " + initImageName)
 
-	initContainer.Name = customResource.Name + "-container-init"
-	initContainer.Image = initImageName
-	initContainer.Command = []string{"/bin/bash"}
-	initContainer.Resources = customResource.Spec.DeploymentPlan.Resources
+	//initContainer.Name = customResource.Name + "-container-init"
+	//initContainer.Image = initImageName
+	//initContainer.Command = []string{"/bin/bash"}
+	//initContainer.Resources = customResource.Spec.DeploymentPlan.Resources
+
+	Spec.InitContainers[0].Name = customResource.Name + "-container-init"
+	Spec.InitContainers[0].Image = initImageName
+	Spec.InitContainers[0].Command = []string{"/bin/bash"}
+	Spec.InitContainers[0].Resources = customResource.Spec.DeploymentPlan.Resources
+
+	//now make volumes mount available to init image
+	log.Info("making volume mounts")
+
+	//setup volumeMounts
+	volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
+	Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
+
+	outputDir := "/yacfg_etc"
+	volumeMountForInitCfg := volumes.MakeVolumeMountForCfg("tool-dir", outputDir)
+	Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForInitCfg)
+
+	//add empty-dir volume
+	volumeForInitCfg := volumes.MakeVolumeForCfg("tool-dir")
+	Spec.Volumes = append(Spec.Volumes, volumeForInitCfg)
+
+	volumeMountForCfgInitRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
+	Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgInitRoot)
+
+	log.Info("Total volumes ", "volumes", Spec.Volumes)
 
 	//address settings
 	addressSettings := customResource.Spec.AddressSettings.AddressSetting
@@ -1663,7 +1691,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 		jsonSpecials := string(byteArray)
 
 		envVarTuneFilePath := "TUNE_PATH"
-		outputDir := "/yacfg_etc"
+		//outputDir := "/yacfg_etc"
 
 		compactVersionToUse := determineCompactVersionToUse(customResource)
 		yacfgProfileVersion = version.FullVersionFromCompactVersion[compactVersionToUse]
@@ -1675,15 +1703,16 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 			outputDir + "/broker.yaml --extra-properties '" + jsonSpecials + "' --output " + outputDir
 		configCmd := "/opt/amq/bin/launch.sh"
 
-		var initArgs []string = []string{"-c", initCmd + " && " + configCmd + " && " + initHelperScript}
+		//var initArgs []string = []string{"-c", initCmd + " && " + configCmd + " && " + initHelperScript}
 
-		initContainer.Args = initArgs
+		//initContainer.Args = initArgs
+		Spec.InitContainers[0].Args = []string{"-c", initCmd + " && " + configCmd + " && " + initHelperScript}
 
 		//populate args of init container
 
-		Spec.InitContainers = []corev1.Container{
-			initContainer,
-		}
+		//Spec.InitContainers = []corev1.Container{
+		//	initContainer,
+		//}
 
 		//expose env for address-settings
 		envVarApplyRule := "APPLY_RULE"
@@ -1713,36 +1742,37 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 		}
 		environments.Create(Spec.InitContainers, &tuneFile)
 
-		//now make volumes mount available to init image
-		log.Info("making volume mounts")
-
-		//setup volumeMounts
-		volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
-		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
-
-		volumeMountForCfg := volumes.MakeVolumeMountForCfg("tool-dir", outputDir)
-		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfg)
-
-		//add empty-dir volume
-		volumeForCfg := volumes.MakeVolumeForCfg("tool-dir")
-		Spec.Volumes = append(Spec.Volumes, volumeForCfg)
-
-		log.Info("Total volumes ", "volumes", Spec.Volumes)
+		////now make volumes mount available to init image
+		//log.Info("making volume mounts")
+		//
+		////setup volumeMounts
+		//volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
+		//Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
+		//
+		//volumeMountForCfg := volumes.MakeVolumeMountForCfg("tool-dir", outputDir)
+		//Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfg)
+		//
+		////add empty-dir volume
+		//volumeForCfg := volumes.MakeVolumeForCfg("tool-dir")
+		//Spec.Volumes = append(Spec.Volumes, volumeForCfg)
+		//
+		//log.Info("Total volumes ", "volumes", Spec.Volumes)
 	} else {
 		log.Info("No addressetings")
 
 		configCmd := "/opt/amq/bin/launch.sh"
 
-		var initArgs []string
-		initArgs = []string{"-c", configCmd + " && " + initHelperScript}
-		initContainer.Args = initArgs
+		//var initArgs []string
+		//initArgs = []string{"-c", configCmd + " && " + initHelperScript}
+		//initContainer.Args = initArgs
+		Spec.InitContainers[0].Args = []string{"-c", configCmd + " && " + initHelperScript}
 
-		Spec.InitContainers = []corev1.Container{
-			initContainer,
-		}
+		//Spec.InitContainers = []corev1.Container{
+		//	initContainer,
+		//}
 
-		volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
-		Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
+		//volumeMountForCfgRoot := volumes.MakeVolumeMountForCfg(cfgVolumeName, brokerConfigRoot)
+		//Spec.InitContainers[0].VolumeMounts = append(Spec.InitContainers[0].VolumeMounts, volumeMountForCfgRoot)
 	}
 
 	dontRun := corev1.EnvVar{

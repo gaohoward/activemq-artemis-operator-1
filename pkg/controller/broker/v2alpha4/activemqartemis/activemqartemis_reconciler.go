@@ -1209,6 +1209,7 @@ func initImageSyncCausedUpdateOn(customResource *brokerv2alpha4.ActiveMQArtemis,
 		initImageName = customResource.Spec.DeploymentPlan.InitImage
 	}
 	if len(currentStatefulSet.Spec.Template.Spec.InitContainers) <= 0 {
+		currentStatefulSet.Spec.Template.Spec.InitContainers = []corev1.Container{}
 		currentStatefulSet.Spec.Template.Spec.InitContainers[0] = containers.MakeInitContainer(customResource.Name + "-container-init", initImageName, MakeEnvVarArrayForCR(customResource))
 	}
 	if strings.Compare(currentStatefulSet.Spec.Template.Spec.InitContainers[0].Image, initImageName) != 0 {

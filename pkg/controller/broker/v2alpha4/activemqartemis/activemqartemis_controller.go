@@ -97,7 +97,7 @@ func (r *ReconcileActiveMQArtemis) Reconcile(request reconcile.Request) (reconci
 
 	// Log where we are and what we're doing
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling ActiveMQArtemis")
+	reqLogger.Info("Reconciling ActiveMQArtemis", "mmm request", request)
 
 	var err error = nil
 	var namespacedNameFSM *ActiveMQArtemisFSM = nil
@@ -143,6 +143,7 @@ func (r *ReconcileActiveMQArtemis) Reconcile(request reconcile.Request) (reconci
 	// for the given fsm, do an update
 	// - update first level sets? what if the operator has gone away and come back? stateless?
 	if namespacedNameFSM = namespacedNameToFSM[namespacedName]; namespacedNameFSM == nil {
+		reqLogger.Info("mmm first time reconcile", "thecr", customResource)
 		// TODO: Fix multiple fsm's post ENTMQBR-2875
 		if len(namespacedNameToFSM) > 0 {
 			reqLogger.Info("ActiveMQArtemis Controller Reconcile does not yet support more than one custom resource instance per namespace!")
@@ -152,15 +153,21 @@ func (r *ReconcileActiveMQArtemis) Reconcile(request reconcile.Request) (reconci
 		namespacedNameToFSM[namespacedName] = amqbfsm
 
 		// Enter the first state; atm CreatingK8sResourcesState
-		amqbfsm.Enter(CreatingK8sResourcesID)
+		reqLogger.Info("requesting fsm enter")
+		err1 := amqbfsm.Enter(CreatingK8sResourcesID)
+		reqLogger.Info("enter done in fsm(note this is not returned to manager ftm, should we?", "any err?", err1)
 	} else {
+		reqLogger.Info("mmm Cr is already in map")
 		amqbfsm = namespacedNameFSM
 		//remember current customeResource so that we can compare for update
 		amqbfsm.UpdateCustomResource(customResource)
 
+		reqLogger.Info("mmm requesting fsm to update")
 		err, _ = amqbfsm.Update()
+		reqLogger.Info("any fsm update error? ", "err", err)
 	}
 
+	reqLogger.Info("Checking return state ", "result", r.result, "err", err)
 	// Single exit, return the result and error condition
 	return r.result, err
 }

@@ -133,14 +133,21 @@ func (amqbfsm *ActiveMQArtemisFSM) Enter(startStateID int) error {
 	// For the moment sequentially set stuff up
 	// k8s resource creation and broker environment configuration can probably be done concurrently later
 	amqbfsm.r.result = reconcile.Result{}
+	log.Info("fsm calling machine enter")
 	if err = amqbfsm.m.Enter(CreatingK8sResourcesID); nil != err {
+		log.Error(err, "why enter machine failed? and then call machine Update?")
 		err, _ = amqbfsm.m.Update()
+		if err != nil {
+			log.Error(err, "again update failed!")
+		}
 	}
 
+	log.Info("returning from fsm enter", "err", err)
 	return err
 }
 
 func (amqbfsm *ActiveMQArtemisFSM) UpdateCustomResource(newRc *brokerv2alpha4.ActiveMQArtemis) {
+	log.Info("fff fsm updating resource", "current", amqbfsm.customResource, "new", newRc)
 	*amqbfsm.prevCustomResource = *amqbfsm.customResource
 	*amqbfsm.customResource = *newRc
 }
@@ -151,7 +158,9 @@ func (amqbfsm *ActiveMQArtemisFSM) Update() (error, int) {
 
 	// Was the current state complete?
 	amqbfsm.r.result = reconcile.Result{}
+	log.Info("fsm calling machine update in update")
 	err, nextStateID := amqbfsm.m.Update()
+	log.Info("did machine update return error", "err", err)
 	ssNamespacedName := types.NamespacedName{Name: statefulsets.NameBuilder.Name(), Namespace: amqbfsm.customResource.Namespace}
 	UpdatePodStatus(amqbfsm.customResource, amqbfsm.r.client, ssNamespacedName)
 

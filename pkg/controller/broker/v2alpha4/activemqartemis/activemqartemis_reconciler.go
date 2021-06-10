@@ -109,12 +109,23 @@ func (reconciler *ActiveMQArtemisReconciler) Process(fsm *ActiveMQArtemisFSM, cl
 	var log = logf.Log.WithName("controller_v2alpha4activemqartemis")
 	log.Info("Reconciler Processing...", "Operator version", version.Version, "ActiveMQArtemis release", fsm.customResource.Spec.Version)
 
+	log.Info("Step1 - processing statefulset", "first time?", firstTime)
 	currentStatefulSet, firstTime := reconciler.ProcessStatefulSet(fsm, client, log, firstTime)
+	log.Info("get currentss from step 1", "ss", currentStatefulSet)
+
+	log.Info("Step2 - processing deplyPlan", "with cr", fsm.customResource, "first time", firstTime)
 	statefulSetUpdates := reconciler.ProcessDeploymentPlan(fsm.customResource, client, scheme, currentStatefulSet, firstTime)
+
+	log.Info("Step3 - processing credentials", "ss now", currentStatefulSet)
 	statefulSetUpdates |= reconciler.ProcessCredentials(fsm.customResource, client, scheme, currentStatefulSet)
+
+	log.Info("Step4 - processing acceptors", "ss now", currentStatefulSet)
 	statefulSetUpdates |= reconciler.ProcessAcceptorsAndConnectors(fsm.customResource, client, scheme, currentStatefulSet)
+
+	log.Info("Step5 - processing console", "ss now", currentStatefulSet)
 	statefulSetUpdates |= reconciler.ProcessConsole(fsm.customResource, client, scheme, currentStatefulSet)
 
+	log.Info("Step6 -- processing k8s resources", "ss now", currentStatefulSet)
 	requestedResources = append(requestedResources, currentStatefulSet)
 	stepsComplete := reconciler.ProcessResources(fsm.customResource, client, scheme, currentStatefulSet)
 
@@ -130,17 +141,20 @@ func (reconciler *ActiveMQArtemisReconciler) Process(fsm *ActiveMQArtemisFSM, cl
 
 func (reconciler *ActiveMQArtemisReconciler) ProcessStatefulSet(fsm *ActiveMQArtemisFSM, client client.Client, log logr.Logger, firstTime bool) (*appsv1.StatefulSet, bool) {
 
+	log.Info("In processstatefulset()...", "first ", firstTime)
 	ssNamespacedName := types.NamespacedName{
 		Name:      ss.NameBuilder.Name(),
 		Namespace: fsm.customResource.Namespace,
 	}
+	log.Info("retriving ss ", "ns", ssNamespacedName)
 	currentStatefulSet, err := ss.RetrieveStatefulSet(ss.NameBuilder.Name(), ssNamespacedName, client)
 	if errors.IsNotFound(err) {
 		log.Info("StatefulSet: " + ssNamespacedName.Name + " not found, will create")
 		currentStatefulSet = NewStatefulSetForCR(fsm.customResource)
+		log.Info("created new statefulSet", currentStatefulSet)
 		firstTime = true
 	} else {
-		log.Info("StatefulSet: " + currentStatefulSet.Name + " found")
+		log.Info("StatefulSet: "+currentStatefulSet.Name+" found", "ss", currentStatefulSet)
 		//update statefulset with customer resource
 		if reconciler.ProcessAddressSettings(fsm.customResource, fsm.prevCustomResource, client) {
 			log.Info("There are new address settings change in the cr, creating a new pod template to update")
@@ -1793,6 +1807,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha4.ActiveMQArtemis) cor
 	log.Info("Final Init spec", "Detail", Spec.InitContainers)
 
 	pts.Spec = Spec
+	log.Info("And final pod template", "pts", pts)
 
 	return pts
 }
@@ -1872,13 +1887,16 @@ func NewStatefulSetForCR(cr *brokerv2alpha4.ActiveMQArtemis) *appsv1.StatefulSet
 		Name:      cr.Name,
 		Namespace: cr.Namespace,
 	}
+	log.Info("createing new ss", "cr", cr)
 	ss, Spec := statefulsets.MakeStatefulSet(namespacedName, cr.Annotations, cr.Spec.DeploymentPlan.Size, NewPodTemplateSpecForCR(cr))
+	log.Info("got ss", "ss", ss, "spec", Spec)
 
 	if cr.Spec.DeploymentPlan.PersistenceEnabled {
 		Spec.VolumeClaimTemplates = *NewPersistentVolumeClaimArrayForCR(cr, 1)
 	}
 	ss.Spec = Spec
 
+	log.Info("final returen ss", "ss", ss)
 	return ss
 }
 

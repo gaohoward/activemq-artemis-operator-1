@@ -1,4 +1,4 @@
-package v1alpha1activemqartemisauthentication
+package v1alpha1activemqartemissecurity
 
 import (
 	"context"
@@ -23,11 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_v1alpha1activemqartemisauthentication")
+var log = logf.Log.WithName("controller_v1alpha1activemqartemissecurity")
 
-//var namespacedNameToAddressName = make(map[types.NamespacedName]brokerv1alpha1.ActiveMQArtemisAuthentication)
+//var namespacedNameToAddressName = make(map[types.NamespacedName]brokerv1alpha1.ActiveMQArtemisSecurity)
 
-// Add creates a new ActiveMQArtemisAuthentication Controller and adds it to the Manager. The Manager will set fields on the Controller
+// Add creates a new ActiveMQArtemisSecurity Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -35,19 +35,19 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileActiveMQArtemisAuthentication{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileActiveMQArtemisSecurity{client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("v1alpha1activemqartemisauthentication-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("v1alpha1activemqartemissecurity-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to primary resource ActiveMQArtemisAuthentication
-	err = c.Watch(&source.Kind{Type: &brokerv1alpha1.ActiveMQArtemisAuthentication{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to primary resource ActiveMQArtemisSecurity
+	err = c.Watch(&source.Kind{Type: &brokerv1alpha1.ActiveMQArtemisSecurity{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -55,21 +55,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileActiveMQArtemisAuthentication{}
+var _ reconcile.Reconciler = &ReconcileActiveMQArtemisSecurity{}
 
-type ReconcileActiveMQArtemisAuthentication struct {
+type ReconcileActiveMQArtemisSecurity struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
 }
 
-func (r *ReconcileActiveMQArtemisAuthentication) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileActiveMQArtemisSecurity) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Reconciling ActiveMQArtemisAuthentication")
+	reqLogger.Info("Reconciling ActiveMQArtemisSecurity")
 
-	instance := &brokerv1alpha1.ActiveMQArtemisAuthentication{}
+	instance := &brokerv1alpha1.ActiveMQArtemisSecurity{}
 
 	if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
@@ -85,7 +85,7 @@ func (r *ReconcileActiveMQArtemisAuthentication) Reconcile(request reconcile.Req
 	}
 
 	reqLogger.Info("Fetched instance", "the instance", instance)
-	v2alpha5.AddBrokerConfigHandler(request.NamespacedName, &ActiveMQArtemisAuthenticationConfigHandler{
+	v2alpha5.AddBrokerConfigHandler(request.NamespacedName, &ActiveMQArtemisSecurityConfigHandler{
 		instance,
 		request.NamespacedName,
 		r,
@@ -93,14 +93,14 @@ func (r *ReconcileActiveMQArtemisAuthentication) Reconcile(request reconcile.Req
 	return reconcile.Result{}, nil
 }
 
-type ActiveMQArtemisAuthenticationConfigHandler struct {
-	AuthenticationCR *brokerv1alpha1.ActiveMQArtemisAuthentication
-	NamespacedName   types.NamespacedName
-	owner            *ReconcileActiveMQArtemisAuthentication
+type ActiveMQArtemisSecurityConfigHandler struct {
+	SecurityCR     *brokerv1alpha1.ActiveMQArtemisSecurity
+	NamespacedName types.NamespacedName
+	owner          *ReconcileActiveMQArtemisSecurity
 }
 
-func (r *ActiveMQArtemisAuthenticationConfigHandler) processCrPasswords() *brokerv1alpha1.ActiveMQArtemisAuthentication {
-	result := r.AuthenticationCR.DeepCopy()
+func (r *ActiveMQArtemisSecurityConfigHandler) processCrPasswords() *brokerv1alpha1.ActiveMQArtemisSecurity {
+	result := r.SecurityCR.DeepCopy()
 
 	if len(result.Spec.LoginModules.PropertiesLoginModules) > 0 {
 		for i, pm := range result.Spec.LoginModules.PropertiesLoginModules {
@@ -146,7 +146,7 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) processCrPasswords() *broke
 }
 
 //retrive value from secret, generate value if not exist.
-func (r *ActiveMQArtemisAuthenticationConfigHandler) getPassword(secretName string, key string) *string {
+func (r *ActiveMQArtemisSecurityConfigHandler) getPassword(secretName string, key string) *string {
 	//check if the secret exists.
 	namespacedName := types.NamespacedName{
 		Name:      secretName,
@@ -160,7 +160,7 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) getPassword(secretName stri
 	if err := resources.Retrieve(namespacedName, r.owner.client, secretDefinition); err != nil {
 		if errors.IsNotFound(err) {
 			//create the secret
-			resources.Create(r.AuthenticationCR, namespacedName, r.owner.client, r.owner.scheme, secretDefinition)
+			resources.Create(r.SecurityCR, namespacedName, r.owner.client, r.owner.scheme, secretDefinition)
 		}
 	} else {
 		log.Info("Found secret " + secretName)
@@ -188,8 +188,8 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) getPassword(secretName stri
 	return &value
 }
 
-func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainers []corev1.Container, outputDirRoot string, yacfgProfileVersion string, yacfgProfileName string) (value []string) {
-	log.Info("Reconciling authentication", "cr", r.AuthenticationCR)
+func (r *ActiveMQArtemisSecurityConfigHandler) Config(initContainers []corev1.Container, outputDirRoot string, yacfgProfileVersion string, yacfgProfileName string) (value []string) {
+	log.Info("Reconciling security", "cr", r.SecurityCR)
 	result := r.processCrPasswords()
 	log.Info("After processing passwords", "result", result)
 	outputDir := outputDirRoot + "/security"
@@ -197,7 +197,7 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainers []cor
 	filePath := outputDir + "/security-config.yaml"
 	cmdPersistCRAsYaml, err := r.persistCR(filePath, result)
 	if err != nil {
-		log.Error(err, "Error marshalling authentication CR", "cr", r.AuthenticationCR)
+		log.Error(err, "Error marshalling security CR", "cr", r.SecurityCR)
 		return nil
 	}
 	log.Info("get the command", "value", cmdPersistCRAsYaml)
@@ -234,7 +234,7 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainers []cor
 
 //we could pass cr (actuall only the spec part) as env var or
 //directly in command line (need yacfg support) instead of writing to a file
-func (r *ActiveMQArtemisAuthenticationConfigHandler) persistCR(filePath string, cr *brokerv1alpha1.ActiveMQArtemisAuthentication) (value string, err error) {
+func (r *ActiveMQArtemisSecurityConfigHandler) persistCR(filePath string, cr *brokerv1alpha1.ActiveMQArtemisSecurity) (value string, err error) {
 
 	data, err := yaml.Marshal(cr)
 	if err != nil {

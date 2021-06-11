@@ -25,7 +25,7 @@ import (
 
 type BrokerV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	ActiveMQArtemisAuthenticationsGetter
+	ActiveMQArtemisSecuritiesGetter
 }
 
 // BrokerV1alpha1Client is used to interact with features provided by the broker.amq.io group.
@@ -33,8 +33,8 @@ type BrokerV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *BrokerV1alpha1Client) ActiveMQArtemisAuthentications(namespace string) ActiveMQArtemisAuthenticationInterface {
-	return newActiveMQArtemisAuthentications(c, namespace)
+func (c *BrokerV1alpha1Client) ActiveMQArtemisSecurities(namespace string) ActiveMQArtemisSecurityInterface {
+	return newActiveMQArtemisSecurities(c, namespace)
 }
 
 // NewForConfig creates a new BrokerV1alpha1Client for the given config.

@@ -54,8 +54,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=broker.amq.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("activemqartemisauthentications"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Broker().V1alpha1().ActiveMQArtemisAuthentications().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("activemqartemissecurities"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Broker().V1alpha1().ActiveMQArtemisSecurities().Informer()}, nil
 	// Group=broker.amq.io, Version=v2alpha1
 	case v2alpha1.SchemeGroupVersion.WithResource("activemqartemises"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Broker().V2alpha1().ActiveMQArtemises().Informer()}, nil

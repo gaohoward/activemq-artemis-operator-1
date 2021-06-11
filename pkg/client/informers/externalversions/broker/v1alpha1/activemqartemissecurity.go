@@ -31,59 +31,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ActiveMQArtemisAuthenticationInformer provides access to a shared informer and lister for
-// ActiveMQArtemisAuthentications.
-type ActiveMQArtemisAuthenticationInformer interface {
+// ActiveMQArtemisSecurityInformer provides access to a shared informer and lister for
+// ActiveMQArtemisSecurities.
+type ActiveMQArtemisSecurityInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ActiveMQArtemisAuthenticationLister
+	Lister() v1alpha1.ActiveMQArtemisSecurityLister
 }
 
-type activeMQArtemisAuthenticationInformer struct {
+type activeMQArtemisSecurityInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewActiveMQArtemisAuthenticationInformer constructs a new informer for ActiveMQArtemisAuthentication type.
+// NewActiveMQArtemisSecurityInformer constructs a new informer for ActiveMQArtemisSecurity type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewActiveMQArtemisAuthenticationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredActiveMQArtemisAuthenticationInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewActiveMQArtemisSecurityInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredActiveMQArtemisSecurityInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredActiveMQArtemisAuthenticationInformer constructs a new informer for ActiveMQArtemisAuthentication type.
+// NewFilteredActiveMQArtemisSecurityInformer constructs a new informer for ActiveMQArtemisSecurity type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredActiveMQArtemisAuthenticationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredActiveMQArtemisSecurityInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BrokerV1alpha1().ActiveMQArtemisAuthentications(namespace).List(options)
+				return client.BrokerV1alpha1().ActiveMQArtemisSecurities(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BrokerV1alpha1().ActiveMQArtemisAuthentications(namespace).Watch(options)
+				return client.BrokerV1alpha1().ActiveMQArtemisSecurities(namespace).Watch(options)
 			},
 		},
-		&brokerv1alpha1.ActiveMQArtemisAuthentication{},
+		&brokerv1alpha1.ActiveMQArtemisSecurity{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *activeMQArtemisAuthenticationInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredActiveMQArtemisAuthenticationInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *activeMQArtemisSecurityInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredActiveMQArtemisSecurityInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *activeMQArtemisAuthenticationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&brokerv1alpha1.ActiveMQArtemisAuthentication{}, f.defaultInformer)
+func (f *activeMQArtemisSecurityInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&brokerv1alpha1.ActiveMQArtemisSecurity{}, f.defaultInformer)
 }
 
-func (f *activeMQArtemisAuthenticationInformer) Lister() v1alpha1.ActiveMQArtemisAuthenticationLister {
-	return v1alpha1.NewActiveMQArtemisAuthenticationLister(f.Informer().GetIndexer())
+func (f *activeMQArtemisSecurityInformer) Lister() v1alpha1.ActiveMQArtemisSecurityLister {
+	return v1alpha1.NewActiveMQArtemisSecurityLister(f.Informer().GetIndexer())
 }

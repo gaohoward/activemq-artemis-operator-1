@@ -1757,7 +1757,7 @@ func NewPodTemplateSpecForCR(customResource *brokerv2alpha5.ActiveMQArtemis) cor
 	brokerConfigHandler := GetBrokerConfigHandler(namespacedName)
 	if brokerConfigHandler != nil {
 		log.Info("there is a config handler")
-		handlerCmds := brokerConfigHandler.Config(Spec.InitContainers, initCfgRootDir+"/authentication", yacfgProfileVersion, yacfgProfileName)
+		handlerCmds := brokerConfigHandler.Config(Spec.InitContainers, initCfgRootDir+"/security", yacfgProfileVersion, yacfgProfileName)
 		log.Info("Getting back some init commands", "handlerCmds", handlerCmds)
 		if len(handlerCmds) > 0 {
 			log.Info("appending to initCmd array...")

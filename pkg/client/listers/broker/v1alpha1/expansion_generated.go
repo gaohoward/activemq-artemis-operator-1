@@ -18,10 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
-// ActiveMQArtemisAuthenticationListerExpansion allows custom methods to be added to
-// ActiveMQArtemisAuthenticationLister.
-type ActiveMQArtemisAuthenticationListerExpansion interface{}
+// ActiveMQArtemisSecurityListerExpansion allows custom methods to be added to
+// ActiveMQArtemisSecurityLister.
+type ActiveMQArtemisSecurityListerExpansion interface{}
 
-// ActiveMQArtemisAuthenticationNamespaceListerExpansion allows custom methods to be added to
-// ActiveMQArtemisAuthenticationNamespaceLister.
-type ActiveMQArtemisAuthenticationNamespaceListerExpansion interface{}
+// ActiveMQArtemisSecurityNamespaceListerExpansion allows custom methods to be added to
+// ActiveMQArtemisSecurityNamespaceLister.
+type ActiveMQArtemisSecurityNamespaceListerExpansion interface{}

@@ -11,17 +11,17 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthentication":       schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthentication(ref),
-		"./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthenticationSpec":   schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthenticationSpec(ref),
-		"./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthenticationStatus": schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthenticationStatus(ref),
+		"./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecurity":       schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisSecurity(ref),
+		"./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecuritySpec":   schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisSecuritySpec(ref),
+		"./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecurityStatus": schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisSecurityStatus(ref),
 	}
 }
 
-func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthentication(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisSecurity(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ActiveMQArtemisAuthentication is the Schema for the activemqartemisauthentications API",
+				Description: "ActiveMQArtemisSecurity is the Schema for the activemqartemissecurities API",
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -44,27 +44,27 @@ func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthentication(ref common.Re
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthenticationSpec"),
+							Ref: ref("./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecuritySpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthenticationStatus"),
+							Ref: ref("./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecurityStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthenticationSpec", "./pkg/apis/broker/v1alpha1.ActiveMQArtemisAuthenticationStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecuritySpec", "./pkg/apis/broker/v1alpha1.ActiveMQArtemisSecurityStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthenticationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisSecuritySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ActiveMQArtemisAuthenticationSpec defines the desired state of ActiveMQArtemisAuthentication",
+				Description: "ActiveMQArtemisSecuritySpec defines the desired state of ActiveMQArtemisSecurity",
 				Properties: map[string]spec.Schema{
 					"domain": {
 						SchemaProps: spec.SchemaProps{
@@ -86,11 +86,11 @@ func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthenticationSpec(ref commo
 	}
 }
 
-func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisAuthenticationStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_broker_v1alpha1_ActiveMQArtemisSecurityStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ActiveMQArtemisAuthenticationStatus defines the observed state of ActiveMQArtemisAuthentication",
+				Description: "ActiveMQArtemisSecurityStatus defines the observed state of ActiveMQArtemisSecurity",
 				Properties:  map[string]spec.Schema{},
 			},
 		},

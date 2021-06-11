@@ -24,8 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ActiveMQArtemisAddresses returns a ActiveMQArtemisAuthenticationInformer.
-	ActiveMQArtemisAddresses() ActiveMQArtemisAuthenticationInformer
+	// ActiveMQArtemisSecurities returns a ActiveMQArtemisSecurityInformer.
+	ActiveMQArtemisSecurities() ActiveMQArtemisSecurityInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// ActiveMQArtemisAuthentications returns a ActiveMQArtemisAuthenticationInformer.
-func (v *version) ActiveMQArtemisAuthentications() ActiveMQArtemisAuthenticationInformer {
-	return &activeMQArtemisAuthenticationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// ActiveMQArtemisSecurities returns a ActiveMQArtemisSecurityInformer.
+func (v *version) ActiveMQArtemisSecurities() ActiveMQArtemisSecurityInformer {
+	return &activeMQArtemisSecurityInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

@@ -7,9 +7,9 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ActiveMQArtemisAuthenticationSpec defines the desired state of ActiveMQArtemisAuthentication
+// ActiveMQArtemisSecuritySpec defines the desired state of ActiveMQArtemisSecurity
 // +k8s:openapi-gen=true
-type ActiveMQArtemisAuthenticationSpec struct {
+type ActiveMQArtemisSecuritySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
@@ -268,9 +268,9 @@ type RoleAccessType struct {
 	AccessList []DefaultAccessType `json:"accessList,omitempty"`
 }
 
-// ActiveMQArtemisAuthenticationStatus defines the observed state of ActiveMQArtemisAuthentication
+// ActiveMQArtemisSecurityStatus defines the observed state of ActiveMQArtemisSecurity
 // +k8s:openapi-gen=true
-type ActiveMQArtemisAuthenticationStatus struct {
+type ActiveMQArtemisSecurityStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
@@ -278,26 +278,26 @@ type ActiveMQArtemisAuthenticationStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ActiveMQArtemisAuthentication is the Schema for the activemqartemisauthentications API
+// ActiveMQArtemisSecurity is the Schema for the activemqartemissecurities API
 // +k8s:openapi-gen=true
 // +genclient
-type ActiveMQArtemisAuthentication struct {
+type ActiveMQArtemisSecurity struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ActiveMQArtemisAuthenticationSpec   `json:"spec,omitempty"`
-	Status ActiveMQArtemisAuthenticationStatus `json:"status,omitempty"`
+	Spec   ActiveMQArtemisSecuritySpec   `json:"spec,omitempty"`
+	Status ActiveMQArtemisSecurityStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ActiveMQArtemisAuthenticationList contains a list of ActiveMQArtemisAuthentication
-type ActiveMQArtemisAuthenticationList struct {
+// ActiveMQArtemisSecurityList contains a list of ActiveMQArtemisSecurity
+type ActiveMQArtemisSecurityList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ActiveMQArtemisAuthentication `json:"items"`
+	Items           []ActiveMQArtemisSecurity `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ActiveMQArtemisAuthentication{}, &ActiveMQArtemisAuthenticationList{})
+	SchemeBuilder.Register(&ActiveMQArtemisSecurity{}, &ActiveMQArtemisSecurityList{})
 }

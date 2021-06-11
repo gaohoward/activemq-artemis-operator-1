@@ -27,21 +27,30 @@ type ActiveMQArtemisConfigHandler interface {
 	Config(initContainers []corev1.Container, outputDirRoot string, yacfgProfileVersion string, yacfgProfileName string) (value []string)
 }
 
-var namespaceToConfigHandler = make(map[string][]ActiveMQArtemisConfigHandler)
+var namespaceToConfigHandler = make(map[string]ActiveMQArtemisConfigHandler)
 
-func GetBrokerConfigHandler(namespacedName types.NamespacedName) (handlers []ActiveMQArtemisConfigHandler) {
+func GetBrokerConfigHandler(namespacedName types.NamespacedName) (handler ActiveMQArtemisConfigHandler) {
 	value, _ := namespaceToConfigHandler[namespacedName.Namespace]
 	return value
 }
 
-func AddBrokerConfigHandler(namespacedName types.NamespacedName, handler ActiveMQArtemisConfigHandler) {
-	handlers, exist := namespaceToConfigHandler[namespacedName.Namespace]
-	if !exist {
-		handlers = make([]ActiveMQArtemisConfigHandler, 0)
+func RemoveBrokerConfigHandler(namespacedName types.NamespacedName) {
+	log.Info("Removing config handler", "name", namespacedName)
+	_, ok := namespaceToConfigHandler[namespacedName.Namespace]
+	if ok {
+		delete(namespaceToConfigHandler, namespacedName.Namespace)
+		log.Info("Handler removed")
 	}
-	handlers = append(handlers, handler)
-	namespaceToConfigHandler[namespacedName.Namespace] = handlers
-	log.Info("A config handler has been added", "new handler", handler)
+}
+
+func AddBrokerConfigHandler(namespacedName types.NamespacedName, handler ActiveMQArtemisConfigHandler) {
+	_, exist := namespaceToConfigHandler[namespacedName.Namespace]
+	if exist {
+		log.Info("There is an old config handler that will be replace")
+	} else {
+		namespaceToConfigHandler[namespacedName.Namespace] = handler
+		log.Info("A config handler has been added", "new handler", handler)
+	}
 }
 
 /**

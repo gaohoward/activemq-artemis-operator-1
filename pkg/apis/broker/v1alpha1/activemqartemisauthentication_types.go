@@ -96,8 +96,8 @@ type KeycloakModuleConfigurationType struct {
 }
 
 type KeyValueType struct {
-	Key   string `json:"key,omitempty"`
-	Value string `json:"value,omitempty"`
+	Key   string  `json:"key,omitempty"`
+	Value *string `json:"value,omitempty"`
 }
 
 type PolicyEnforcerType struct {
@@ -187,8 +187,8 @@ type GenericLoginModuleType struct {
 
 type SecurityDomainsType struct {
 	BrokerDomain  BrokerDomainType `json:"brokerDomain,omitempty"`
-	certDomain    CertDomainType   `json:"certDomain,omitempty"`
-	consoleDomain BrokerDomainType `json:"consoleDomain,omitempty"`
+	CertDomain    CertDomainType   `json:"certDomain,omitempty"`
+	ConsoleDomain BrokerDomainType `json:"consoleDomain,omitempty"`
 }
 
 type BrokerDomainType struct {
@@ -224,6 +224,7 @@ type PermissionType struct {
 }
 
 type ManagementSecuritySettingsType struct {
+	HawtioRoles   []string                `json:"hawtioRoles,omitempty"`
 	Connector     ConnectorConfigType     `json:"connector,omitempty"`
 	Authorisation AuthorisationConfigType `json:"authorisation,omitempty"`
 }
@@ -246,12 +247,12 @@ type ConnectorConfigType struct {
 }
 
 type AuthorisationConfigType struct {
-	Whitelist     []WhitelistEntryType `json:"whitelist,omitempty"`
-	DefaultAccess []DefaultAccessType  `json:"defaultAccess,omitempty"`
-	RoleAccess    []RoleAccessType     `json:"roleAccess,omitempty"`
+	AllowedList   []AllowedListEntryType `json:"allowedList,omitempty"`
+	DefaultAccess []DefaultAccessType    `json:"defaultAccess,omitempty"`
+	RoleAccess    []RoleAccessType       `json:"roleAccess,omitempty"`
 }
 
-type WhitelistEntryType struct {
+type AllowedListEntryType struct {
 	Domain *string `json:"domain,omitempty"`
 	Key    *string `json:"key,omitempty"`
 }

@@ -431,6 +431,10 @@ spec:
                   description: management api access control
                   type: object
                   properties:
+                    hawtioRoles:
+                      type: array
+                      items:
+                        type: string
                     connector:
                       type: object
                       properties:

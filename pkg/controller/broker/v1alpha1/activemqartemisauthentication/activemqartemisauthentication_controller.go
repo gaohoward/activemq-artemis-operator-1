@@ -73,6 +73,8 @@ func (r *ReconcileActiveMQArtemisAuthentication) Reconcile(request reconcile.Req
 
 	if err := r.client.Get(context.TODO(), request.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
+			//unregister the CR
+			v2alpha5.RemoveBrokerConfigHandler(request.NamespacedName)
 			// Setting err to nil to prevent requeue
 			err = nil
 		} else {
@@ -116,17 +118,28 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) processCrPasswords() *broke
 
 	if len(result.Spec.LoginModules.KeycloakLoginModules) > 0 {
 		for _, pm := range result.Spec.LoginModules.KeycloakLoginModules {
-			if pm.Configuration.ClientKeyPassword == nil {
-				pm.Configuration.ClientKeyPassword = r.getPassword("security-keycloak-"+pm.Name, "client-key-password")
+			keycloakSecretName := "security-keycloak-" + pm.Name
+			if pm.Configuration.ClientKeyStore != nil {
+				if pm.Configuration.ClientKeyPassword == nil {
+					pm.Configuration.ClientKeyPassword = r.getPassword(keycloakSecretName, "client-key-password")
+				}
+				if pm.Configuration.ClientKeyStorePassword == nil {
+					pm.Configuration.ClientKeyStorePassword = r.getPassword(keycloakSecretName, "client-key-store-password")
+				}
 			}
-			if pm.Configuration.ClientKeyStorePassword == nil {
-				pm.Configuration.ClientKeyStorePassword = r.getPassword("security-keycloak-"+pm.Name, "client-key-store-password")
-			}
-			if pm.Configuration.TrustStorePassword == nil {
-				pm.Configuration.TrustStorePassword = r.getPassword("security-keycloak-"+pm.Name, "trust-store-password")
+			if pm.Configuration.TrustStore != nil {
+				if pm.Configuration.TrustStorePassword == nil {
+					pm.Configuration.TrustStorePassword = r.getPassword(keycloakSecretName, "trust-store-password")
+				}
 			}
 			//need to process pm.Configuration.Credentials too. later.
-			log.Info("set keycloak module passwords", "module", pm.Name, "clientkeypass", pm.Configuration.ClientKeyPassword, "keystore", pm.Configuration.ClientKeyStorePassword, "truststore", pm.Configuration.TrustStorePassword)
+			if len(pm.Configuration.Credentials) > 0 {
+				for i, kv := range pm.Configuration.Credentials {
+					if kv.Value == nil {
+						pm.Configuration.Credentials[i].Value = r.getPassword(keycloakSecretName, "credentials-"+kv.Key)
+					}
+				}
+			}
 		}
 	}
 	return result
@@ -215,6 +228,7 @@ func (r *ActiveMQArtemisAuthenticationConfigHandler) Config(initContainers []cor
 	}
 	environments.Create(initContainers, &envVar)
 
+	log.Info("returning config cmds", "value", configCmds)
 	return configCmds
 }
 

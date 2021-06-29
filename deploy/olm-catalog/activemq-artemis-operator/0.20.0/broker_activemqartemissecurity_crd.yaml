@@ -276,7 +276,7 @@ spec:
                     authorisation:
                       type: object
                       properties:
-                        whiteList:
+                        allowedList:
                           type: array
                           items:
                             type: object

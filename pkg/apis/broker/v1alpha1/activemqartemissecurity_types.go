@@ -112,11 +112,6 @@ type LoginModuleReferenceType struct {
 	Reload *bool   `json:"reload,omitempty"`
 }
 
-type CertDomainType struct {
-	Name        *string                  `json:"name,omitempty"`
-	LoginModule LoginModuleReferenceType `json:"loginModule"`
-}
-
 type SecuritySettingsType struct {
 	Broker     []BrokerSecuritySettingType    `json:"broker,omitempty"`
 	Management ManagementSecuritySettingsType `json:"management,omitempty"`

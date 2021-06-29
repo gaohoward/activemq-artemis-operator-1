@@ -17,10 +17,12 @@ limitations under the License.
 package versioned
 
 import (
+	brokerv1alpha1 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v1alpha1"
 	brokerv2alpha1 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v2alpha1"
 	brokerv2alpha2 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v2alpha2"
 	brokerv2alpha3 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v2alpha3"
 	brokerv2alpha4 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v2alpha4"
+	brokerv2alpha5 "github.com/artemiscloud/activemq-artemis-operator/pkg/client/clientset/versioned/typed/broker/v2alpha5"
 	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -29,22 +31,31 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	BrokerV1alpha1() brokerv1alpha1.BrokerV1alpha1Interface
 	BrokerV2alpha1() brokerv2alpha1.BrokerV2alpha1Interface
 	BrokerV2alpha2() brokerv2alpha2.BrokerV2alpha2Interface
 	BrokerV2alpha3() brokerv2alpha3.BrokerV2alpha3Interface
 	BrokerV2alpha4() brokerv2alpha4.BrokerV2alpha4Interface
+	BrokerV2alpha5() brokerv2alpha5.BrokerV2alpha5Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Broker() brokerv2alpha4.BrokerV2alpha4Interface
+	Broker() brokerv2alpha5.BrokerV2alpha5Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	brokerV1alpha1 *brokerv1alpha1.BrokerV1alpha1Client
 	brokerV2alpha1 *brokerv2alpha1.BrokerV2alpha1Client
 	brokerV2alpha2 *brokerv2alpha2.BrokerV2alpha2Client
 	brokerV2alpha3 *brokerv2alpha3.BrokerV2alpha3Client
 	brokerV2alpha4 *brokerv2alpha4.BrokerV2alpha4Client
+	brokerV2alpha5 *brokerv2alpha5.BrokerV2alpha5Client
+}
+
+// BrokerV1alpha1 retrieves the BrokerV1alpha1Client
+func (c *Clientset) BrokerV1alpha1() brokerv1alpha1.BrokerV1alpha1Interface {
+	return c.brokerV1alpha1
 }
 
 // BrokerV2alpha1 retrieves the BrokerV2alpha1Client
@@ -67,10 +78,15 @@ func (c *Clientset) BrokerV2alpha4() brokerv2alpha4.BrokerV2alpha4Interface {
 	return c.brokerV2alpha4
 }
 
+// BrokerV2alpha5 retrieves the BrokerV2alpha5Client
+func (c *Clientset) BrokerV2alpha5() brokerv2alpha5.BrokerV2alpha5Interface {
+	return c.brokerV2alpha5
+}
+
 // Deprecated: Broker retrieves the default version of BrokerClient.
 // Please explicitly pick a version.
-func (c *Clientset) Broker() brokerv2alpha4.BrokerV2alpha4Interface {
-	return c.brokerV2alpha4
+func (c *Clientset) Broker() brokerv2alpha5.BrokerV2alpha5Interface {
+	return c.brokerV2alpha5
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -89,6 +105,11 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
+	cs.brokerV1alpha1, err = brokerv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
 	cs.brokerV2alpha1, err = brokerv2alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -105,6 +126,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.brokerV2alpha5, err = brokerv2alpha5.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -118,10 +143,12 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
+	cs.brokerV1alpha1 = brokerv1alpha1.NewForConfigOrDie(c)
 	cs.brokerV2alpha1 = brokerv2alpha1.NewForConfigOrDie(c)
 	cs.brokerV2alpha2 = brokerv2alpha2.NewForConfigOrDie(c)
 	cs.brokerV2alpha3 = brokerv2alpha3.NewForConfigOrDie(c)
 	cs.brokerV2alpha4 = brokerv2alpha4.NewForConfigOrDie(c)
+	cs.brokerV2alpha5 = brokerv2alpha5.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -130,10 +157,12 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.brokerV1alpha1 = brokerv1alpha1.New(c)
 	cs.brokerV2alpha1 = brokerv2alpha1.New(c)
 	cs.brokerV2alpha2 = brokerv2alpha2.New(c)
 	cs.brokerV2alpha3 = brokerv2alpha3.New(c)
 	cs.brokerV2alpha4 = brokerv2alpha4.New(c)
+	cs.brokerV2alpha5 = brokerv2alpha5.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

@@ -174,14 +174,11 @@ func (r *ActiveMQArtemisSecurityConfigHandler) getPassword(secretName string, ke
 	//now need generate value
 	value := random.GenerateRandomString(8)
 	//update the secret
-	log.Info("========debug")
-	log.Info("show secret def whole", "value", secretDefinition)
-	log.Info("show secret def", "data", secretDefinition.Data)
 	if secretDefinition.Data == nil {
 		secretDefinition.Data = make(map[string][]byte)
 	}
 	secretDefinition.Data[key] = []byte(value)
-	log.Info("Updating secret", "secret", namespacedName.Name, "values", secretDefinition.StringData)
+	log.Info("Updating secret", "secret", namespacedName.Name)
 	if err := resources.Update(namespacedName, r.owner.client, secretDefinition); err != nil {
 		log.Error(err, "failed to update secret", "secret", secretName)
 	}
@@ -191,7 +188,6 @@ func (r *ActiveMQArtemisSecurityConfigHandler) getPassword(secretName string, ke
 func (r *ActiveMQArtemisSecurityConfigHandler) Config(initContainers []corev1.Container, outputDirRoot string, yacfgProfileVersion string, yacfgProfileName string) (value []string) {
 	log.Info("Reconciling security", "cr", r.SecurityCR)
 	result := r.processCrPasswords()
-	log.Info("After processing passwords", "result", result)
 	outputDir := outputDirRoot + "/security"
 	var configCmds = []string{"echo \"making dir " + outputDir + "\"", "mkdir -p " + outputDir}
 	filePath := outputDir + "/security-config.yaml"
@@ -203,7 +199,6 @@ func (r *ActiveMQArtemisSecurityConfigHandler) Config(initContainers []corev1.Co
 	log.Info("get the command", "value", cmdPersistCRAsYaml)
 	configCmds = append(configCmds, cmdPersistCRAsYaml)
 	configCmds = append(configCmds, "/opt/amq-broker/script/cfg/config-security.sh")
-	//export env var SECURITY_CFG_YAML
 	envVarName := "SECURITY_CFG_YAML"
 	envVar := corev1.EnvVar{
 		envVarName,
@@ -232,8 +227,6 @@ func (r *ActiveMQArtemisSecurityConfigHandler) Config(initContainers []corev1.Co
 	return configCmds
 }
 
-//we could pass cr (actuall only the spec part) as env var or
-//directly in command line (need yacfg support) instead of writing to a file
 func (r *ActiveMQArtemisSecurityConfigHandler) persistCR(filePath string, cr *brokerv1alpha1.ActiveMQArtemisSecurity) (value string, err error) {
 
 	data, err := yaml.Marshal(cr)

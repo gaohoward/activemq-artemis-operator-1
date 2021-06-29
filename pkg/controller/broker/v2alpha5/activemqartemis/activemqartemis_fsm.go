@@ -118,7 +118,15 @@ func ID() int {
 	return ActiveMQArtemisFSMID
 }
 
+func (amqbfsm *ActiveMQArtemisFSM) panicOccurred() {
+	if err := recover(); err != nil {
+		log.Error(nil, "Panic happened with error!", "details", err)
+	}
+}
+
 func (amqbfsm *ActiveMQArtemisFSM) Enter(startStateID int) error {
+
+	defer amqbfsm.panicOccurred()
 
 	var err error = nil
 
@@ -138,6 +146,8 @@ func (amqbfsm *ActiveMQArtemisFSM) UpdateCustomResource(newRc *brokerv2alpha5.Ac
 }
 
 func (amqbfsm *ActiveMQArtemisFSM) Update() (error, int) {
+
+	defer amqbfsm.panicOccurred()
 
 	// Was the current state complete?
 	amqbfsm.r.result = reconcile.Result{}

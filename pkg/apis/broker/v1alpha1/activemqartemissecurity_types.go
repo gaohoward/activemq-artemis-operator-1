@@ -97,7 +97,6 @@ type KeyValueType struct {
 
 type SecurityDomainsType struct {
 	BrokerDomain  BrokerDomainType `json:"brokerDomain,omitempty"`
-	CertDomain    CertDomainType   `json:"certDomain,omitempty"`
 	ConsoleDomain BrokerDomainType `json:"consoleDomain,omitempty"`
 }
 

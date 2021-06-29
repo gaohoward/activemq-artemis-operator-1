@@ -818,7 +818,6 @@ func (in *RoleAccessType) DeepCopy() *RoleAccessType {
 func (in *SecurityDomainsType) DeepCopyInto(out *SecurityDomainsType) {
 	*out = *in
 	in.BrokerDomain.DeepCopyInto(&out.BrokerDomain)
-	in.CertDomain.DeepCopyInto(&out.CertDomain)
 	in.ConsoleDomain.DeepCopyInto(&out.ConsoleDomain)
 	return
 }

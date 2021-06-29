@@ -192,23 +192,6 @@ spec:
                             type: boolean
                           reload:
                             type: boolean                  
-                certDomain:
-                  description: the certification domain config
-                  type: object
-                  properties:
-                    name:
-                      type: string
-                    loginModule:
-                      type: object
-                      properties:
-                        name:
-                          type: string
-                        flag:
-                          type: string
-                        debug:
-                          type: boolean
-                        reload:
-                          type: boolean
                 consoleDomain:
                   description: the console domain config
                   type: object

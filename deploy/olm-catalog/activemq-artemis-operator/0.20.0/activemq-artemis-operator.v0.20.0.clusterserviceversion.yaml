@@ -1030,6 +1030,12 @@ spec:
             x-descriptors:
               - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:ActiveMQArtemisSecurity'
               - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: CORS allowed headers
+            displayName: CORS Allowed Headerss
+            path: loginModules.keycloakLoginModules[0].configuration.corsAllowedHeaders
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:ActiveMQArtemisSecurity'
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
           - description: CORS exposed headers
             displayName: CORS Exposed Headers
             path: loginModules.keycloakLoginModules[0].configuration.corsExposedHeaders
@@ -1128,7 +1134,7 @@ spec:
               - 'urn:alm:descriptor:com.tectonic.ui:text'
           - description: Cookie path for a cookie store
             displayName: Cookie Path
-            path: loginModules.keycloakLoginModules[0].configuration.adapterStateCookiePath
+            path: loginModules.keycloakLoginModules[0].configuration.tokenCookiePath
             x-descriptors:
               - 'urn:alm:descriptor:com.tectonic.ui:fieldGroup:ActiveMQArtemisSecurity'
               - 'urn:alm:descriptor:com.tectonic.ui:text'

@@ -104,6 +104,8 @@ spec:
                             type: integer
                           corsAllowedMethods:
                             type: string
+                          corsAllowedHeaders:
+                            type: string
                           corsExposedHeaders:
                             type: string
                           exposeToken:
@@ -136,7 +138,7 @@ spec:
                             type: integer
                           tokenStore:
                             type: string
-                          adapterStateCookiePath:
+                          tokenCookiePath:
                             type: string
                           principalAttribute:
                             type: string

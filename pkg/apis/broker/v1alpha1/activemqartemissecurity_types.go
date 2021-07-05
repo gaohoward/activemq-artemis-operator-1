@@ -59,6 +59,7 @@ type KeycloakModuleConfigurationType struct {
 	EnableCors                    *bool          `json:"enableCors,omitempty"`
 	CorsMaxAge                    *int64         `json:"corsMaxAge,omitempty"`
 	CorsAllowedMethods            *string        `json:"corsAllowedMethods,omitempty"`
+	CorsAllowedHeaders            *string        `json:"corsAllowedHeaders,omitempty"`
 	CorsExposedHeaders            *string        `json:"corsExposedHeaders,omitempty"`
 	ExposeToken                   *bool          `json:"exposeToken,omitempty"`
 	BearerOnly                    *bool          `json:"bearerOnly,omitempty"`
@@ -75,7 +76,7 @@ type KeycloakModuleConfigurationType struct {
 	RegisterNodeAtStartup         *bool          `json:"registerNodeAtStartup,omitempty"`
 	RegisterNodePeriod            *int64         `json:"registerNodePeriod,omitempty"`
 	TokenStore                    *string        `json:"tokenStore,omitempty"`
-	AdapterStateCookiePath        *string        `json:"adapterStateCookiePath,omitempty"`
+	TokenCookiePath               *string        `json:"tokenCookiePath,omitempty"`
 	PrincipalAttribute            *string        `json:"principalAttribute,omitempty"`
 	ProxyUrl                      *string        `json:"proxyUrl,omitempty"`
 	TurnOffChangeSessionIdOnLogin *bool          `json:"turnOffChangeSessionIdOnLogin,omitempty"`

@@ -459,6 +459,11 @@ func (in *KeycloakModuleConfigurationType) DeepCopyInto(out *KeycloakModuleConfi
 		*out = new(string)
 		**out = **in
 	}
+	if in.CorsAllowedHeaders != nil {
+		in, out := &in.CorsAllowedHeaders, &out.CorsAllowedHeaders
+		*out = new(string)
+		**out = **in
+	}
 	if in.CorsExposedHeaders != nil {
 		in, out := &in.CorsExposedHeaders, &out.CorsExposedHeaders
 		*out = new(string)
@@ -539,8 +544,8 @@ func (in *KeycloakModuleConfigurationType) DeepCopyInto(out *KeycloakModuleConfi
 		*out = new(string)
 		**out = **in
 	}
-	if in.AdapterStateCookiePath != nil {
-		in, out := &in.AdapterStateCookiePath, &out.AdapterStateCookiePath
+	if in.TokenCookiePath != nil {
+		in, out := &in.TokenCookiePath, &out.TokenCookiePath
 		*out = new(string)
 		**out = **in
 	}

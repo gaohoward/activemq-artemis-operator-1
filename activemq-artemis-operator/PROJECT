@@ -6,4 +6,14 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: activemq-artemis-operator
 repo: github.com/artemiscloud/activemq-artemis-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: amq.io
+  group: broker
+  kind: ActiveMQArtemis
+  path: github.com/artemiscloud/activemq-artemis-operator/api/v2alpha5
+  version: v2alpha5
 version: "3"

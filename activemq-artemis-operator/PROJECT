@@ -16,4 +16,13 @@ resources:
   kind: ActiveMQArtemis
   path: github.com/artemiscloud/activemq-artemis-operator/api/v2alpha5
   version: v2alpha5
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: amq.io
+  group: broker
+  kind: ActiveMQArtemisAddress
+  path: github.com/artemiscloud/activemq-artemis-operator/api/v2alpha3
+  version: v2alpha3
 version: "3"

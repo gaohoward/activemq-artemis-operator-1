@@ -1,4 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - broker_v2alpha5_activemqartemis.yaml
+- broker_v2alpha3_activemqartemisaddress.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

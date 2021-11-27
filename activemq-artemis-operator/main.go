@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	brokerv1alpha1 "github.com/artemiscloud/activemq-artemis-operator/api/v1alpha1"
 	brokerv2alpha1 "github.com/artemiscloud/activemq-artemis-operator/api/v2alpha1"
 	brokerv2alpha3 "github.com/artemiscloud/activemq-artemis-operator/api/v2alpha3"
 	brokerv2alpha5 "github.com/artemiscloud/activemq-artemis-operator/api/v2alpha5"
@@ -49,6 +50,7 @@ func init() {
 	utilruntime.Must(brokerv2alpha5.AddToScheme(scheme))
 	utilruntime.Must(brokerv2alpha3.AddToScheme(scheme))
 	utilruntime.Must(brokerv2alpha1.AddToScheme(scheme))
+	utilruntime.Must(brokerv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -101,6 +103,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ActiveMQArtemisScaledown")
+		os.Exit(1)
+	}
+	if err = (&controllers.ActiveMQArtemisSecurityReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ActiveMQArtemisSecurity")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

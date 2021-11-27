@@ -2,4 +2,5 @@
 resources:
 - broker_v2alpha5_activemqartemis.yaml
 - broker_v2alpha3_activemqartemisaddress.yaml
+- broker_v2alpha1_activemqartemisscaledown.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

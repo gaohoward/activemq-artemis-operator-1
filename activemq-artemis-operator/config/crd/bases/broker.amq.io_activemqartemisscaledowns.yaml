@@ -38,10 +38,10 @@ spec:
             description: ActiveMQArtemisScaledownSpec defines the desired state of
               ActiveMQArtemisScaledown
             properties:
-              foo:
-                description: Foo is an example field of ActiveMQArtemisScaledown.
-                  Edit activemqartemisscaledown_types.go to remove/update
-                type: string
+              localOnly:
+                type: boolean
+            required:
+            - localOnly
             type: object
           status:
             description: ActiveMQArtemisScaledownStatus defines the observed state

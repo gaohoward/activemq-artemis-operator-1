@@ -37,9 +37,87 @@ spec:
           spec:
             description: ActiveMQArtemisAddressSpec defines the desired state of ActiveMQArtemisAddress
             properties:
-              foo:
-                description: Foo is an example field of ActiveMQArtemisAddress. Edit
-                  activemqartemisaddress_types.go to remove/update
+              addressName:
+                type: string
+              applyToCrNames:
+                items:
+                  type: string
+                type: array
+              password:
+                type: string
+              queueConfiguration:
+                properties:
+                  autoCreateAddress:
+                    type: boolean
+                  autoDelete:
+                    type: boolean
+                  autoDeleteDelay:
+                    format: int64
+                    type: integer
+                  autoDeleteMessageCount:
+                    format: int64
+                    type: integer
+                  configurationManaged:
+                    type: boolean
+                  consumerPriority:
+                    format: int32
+                    type: integer
+                  consumersBeforeDispatch:
+                    format: int32
+                    type: integer
+                  delayBeforeDispatch:
+                    format: int64
+                    type: integer
+                  durable:
+                    type: boolean
+                  enabled:
+                    type: boolean
+                  exclusive:
+                    type: boolean
+                  filterString:
+                    type: string
+                  groupBuckets:
+                    format: int32
+                    type: integer
+                  groupFirstKey:
+                    type: string
+                  groupRebalance:
+                    type: boolean
+                  groupRebalancePauseDispatch:
+                    type: boolean
+                  ignoreIfExists:
+                    type: boolean
+                  lastValue:
+                    type: boolean
+                  lastValueKey:
+                    type: string
+                  maxConsumers:
+                    format: int32
+                    type: integer
+                  nonDestructive:
+                    type: boolean
+                  purgeOnNoConsumers:
+                    type: boolean
+                  ringSize:
+                    format: int64
+                    type: integer
+                  routingType:
+                    type: string
+                  temporary:
+                    type: boolean
+                  user:
+                    type: string
+                required:
+                - maxConsumers
+                - purgeOnNoConsumers
+                type: object
+              queueName:
+                type: string
+              removeFromBrokerOnDelete:
+                type: boolean
+              routingType:
+                type: string
+              user:
                 type: string
             type: object
           status:

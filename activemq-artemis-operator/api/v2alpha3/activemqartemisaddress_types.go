@@ -75,6 +75,7 @@ type ActiveMQArtemisAddressStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 
 // ActiveMQArtemisAddress is the Schema for the activemqartemisaddresses API
 type ActiveMQArtemisAddress struct {

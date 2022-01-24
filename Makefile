@@ -5,14 +5,14 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
-OPERATOR_VERSION := 0.20.1
-OPERATOR_ACCOUNT_NAME := activemq-artemis-operator
-OPERATOR_CLUSTER_ROLE_NAME := activemq-artemis-operator
-OPERATOR_IMAGE_REPO := quay.io/artemiscloud/activemq-artemis-operator
+OPERATOR_VERSION := 7.10.0
+OPERATOR_ACCOUNT_NAME := amq-broker-operator
+OPERATOR_CLUSTER_ROLE_NAME := amq-broker-operator
+OPERATOR_IMAGE_REPO := registry.redhat.io/amq7/amq-broker-rhel8-operator
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
-CHANNELS = "upstream"
+CHANNELS = "7.x"
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
 # - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=candidate,fast,stable)
 # - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
@@ -22,7 +22,7 @@ endif
 
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
-DEFAULT_CHANNEL = "upstream"
+DEFAULT_CHANNEL = "7.x"
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")

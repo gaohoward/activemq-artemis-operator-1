@@ -80,7 +80,8 @@ func printVersion() {
 	log.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goruntime.GOOS, goruntime.GOARCH))
 	log.Info(fmt.Sprintf("Version of operator-sdk: %v", sdkVersion))
 	log.Info(fmt.Sprintf("Version of the operator: %s", version.Version))
-	log.Info(fmt.Sprintf("Supported ActiveMQArtemis Kubernetes Image Versions: %s", getSupportedBrokerVersions()))
+	log.Info(fmt.Sprintf("Product Version: %s", version.LatestVersion))
+	log.Info(fmt.Sprintf("Supported AMQ Broker Product Versions: %s", getSupportedBrokerVersions()))
 }
 
 func init() {
@@ -127,6 +128,7 @@ func main() {
 	}
 
 	printVersion()
+
 	oprNameSpace, err := sdkk8sutil.GetOperatorNamespace()
 	if err != nil {
 		log.Error(err, "failed to get operator namespace")
@@ -202,7 +204,7 @@ func main() {
 		log.Error(err, "can't create client from config")
 		os.Exit(1)
 	} else {
-		setupAccountName(clnt, ctx, oprNameSpace, name, watchNameSpace == oprNameSpace)
+		setupAccountName(clnt, ctx, oprNameSpace, name)
 	}
 
 	if err = (&controllers.ActiveMQArtemisReconciler{
@@ -297,7 +299,7 @@ func getSupportedBrokerVersions() string {
 	return strings.TrimSpace(supportedProductVersions)
 }
 
-func setupAccountName(clnt client.Client, ctx context.Context, ns, podname string, watchLocal bool) {
+func setupAccountName(clnt client.Client, ctx context.Context, ns, podname string) {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",

@@ -206,5 +206,5 @@ spec:
           requests:
             cpu: 100m
             memory: 20Mi
-      serviceAccountName: amq-broker-operator
+      serviceAccountName: operator
       terminationGracePeriodSeconds: 10

@@ -7,7 +7,7 @@ VERSION ?= 0.0.1
 
 OPERATOR_VERSION := 7.10.0
 OPERATOR_ACCOUNT_NAME := amq-broker-operator
-OPERATOR_CLUSTER_ROLE_NAME := amq-broker-operator
+OPERATOR_CLUSTER_ROLE_NAME := operator
 OPERATOR_IMAGE_REPO := registry.redhat.io/amq7/amq-broker-rhel8-operator
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -122,8 +122,8 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-	# $(KUSTOMIZE) build config/default > tmp/deploy.yaml
+	# $(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/default > tmp/deploy.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -

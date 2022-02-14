@@ -21,6 +21,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -32,13 +33,13 @@ import (
 
 	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
+	coreV1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("artemis controller", func() {
 
 	// Define utility constants for object names and testing timeouts/durations and intervals.
 	const (
-		name      = "t1"
 		namespace = "default"
 		timeout   = time.Second * 10
 		duration  = time.Second * 10
@@ -47,6 +48,7 @@ var _ = Describe("artemis controller", func() {
 
 	Context("With delopyed controller", func() {
 		It("Expect pod desc", func() {
+			name := "t1"
 			By("By creating a new crd")
 			ctx := context.Background()
 			crd := &brokerv1beta1.ActiveMQArtemis{
@@ -106,5 +108,104 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Equal(1))
 
 		})
+
+		It("Expect vol mount via config map", func() {
+			name := "t2"
+			By("By creating a new crd with broker props")
+			ctx := context.Background()
+			crd := &brokerv1beta1.ActiveMQArtemis{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ActiveMQArtemis",
+					APIVersion: brokerv1beta1.GroupVersion.Identifier(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: brokerv1beta1.ActiveMQArtemisSpec{
+					BrokerProperties: map[string]string{
+						"globalMaxSize": "512MB",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, crd)).Should(Succeed())
+
+			createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+
+			Eventually(func() bool {
+				key := types.NamespacedName{Name: name, Namespace: namespace}
+				err := k8sClient.Get(ctx, key, createdCrd)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+			Expect(createdCrd.Name).Should(Equal(name))
+
+			By("By finding a new config map with broker props")
+			configMap := &coreV1.ConfigMap{}
+			nameOfConfigMap := namer.CrToBpCM(name)
+			Eventually(func() bool {
+
+				key := types.NamespacedName{Name: nameOfConfigMap, Namespace: namespace}
+				err := k8sClient.Get(ctx, key, configMap)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+			Expect(configMap.ObjectMeta.Name).Should(Equal(nameOfConfigMap))
+
+			By("By checking the container of stateful set for java opts")
+			Eventually(func() (bool, error) {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: namespace}
+				createdSs := &appsv1.StatefulSet{}
+
+				err := k8sClient.Get(ctx, key, createdSs)
+				if err != nil {
+					fmt.Printf("Error getting ss: %v\n", err)
+					return false, err
+				}
+				fmt.Printf("SS: %v\n", createdSs)
+
+				found := false
+				for _, container := range createdSs.Spec.Template.Spec.InitContainers {
+					fmt.Printf("Container: %v\n", container.Name)
+					for _, env := range container.Env {
+						fmt.Printf("Env: %v\n", env)
+						if env.Name == "JAVA_OPTS" {
+							if strings.Contains(env.Value, "broker.properties") {
+								found = true
+							}
+						}
+					}
+				}
+
+				return found, err
+			}, duration, interval).Should(Equal(true))
+
+			By("By checking the container of stateful set for volume mount path")
+			Eventually(func() (bool, error) {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: namespace}
+				createdSs := &appsv1.StatefulSet{}
+
+				err := k8sClient.Get(ctx, key, createdSs)
+				if err != nil {
+					fmt.Printf("Error getting ss: %v\n", err)
+					return false, err
+				}
+				fmt.Printf("SS: %v\n", createdSs)
+
+				found := false
+				for _, container := range createdSs.Spec.Template.Spec.Containers {
+					fmt.Printf("Container: %v\n", container.Name)
+					for _, vm := range container.VolumeMounts {
+						fmt.Printf("Volume mount: %v\n", vm)
+						// mount path can't have a .
+						if strings.Contains(vm.MountPath, "broker-properties") {
+							found = true
+						}
+					}
+				}
+
+				return found, err
+			}, duration, interval).Should(Equal(true))
+
+		})
+
 	})
 })

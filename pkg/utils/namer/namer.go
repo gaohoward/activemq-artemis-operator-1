@@ -58,6 +58,10 @@ func (n *NamerData) Name() string {
 	return n.name
 }
 
+func CrToBpCM(crName string) string {
+	return "broker-properties"
+}
+
 func CrToSS(crName string) string {
 	return crName + "-ss"
 }

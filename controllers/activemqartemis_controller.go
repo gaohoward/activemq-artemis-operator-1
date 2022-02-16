@@ -20,6 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
+	nsoptions "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/namespaces"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/lsrcrs"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,12 +33,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
-	nsoptions "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/namespaces"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/lsrcrs"
-	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 )
 
 var clog = ctrl.Log.WithName("controller_v1beta1activemqartemis")

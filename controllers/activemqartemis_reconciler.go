@@ -218,6 +218,12 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessStatefulSet(fsm *ActiveM
 			fsm.SetPodInvalid(false)
 			newPodTemplateCreated = true
 		}
+		//update config map (todo: check existence and changes)
+		if len(fsm.customResource.Spec.BrokerProperties) > 0 {
+			//do update
+			updateBrokerPropertiesConfigMap(fsm)
+		}
+
 	}
 
 	labels := fsm.namers.LabelBuilder.Labels()
@@ -1829,6 +1835,19 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM) corev1.PodTemplateSpec {
 	}
 	environments.Create(Spec.Containers, &envBrokerCustomInstanceDir)
 
+	reqLogger.Info("Creating check property env var")
+	envCheckProp := corev1.EnvVar{
+		Name:  "CHECK_PROPERTIES",
+		Value: "true",
+	}
+	environments.Create(Spec.Containers, &envCheckProp)
+	//then tell the location
+	envPropPath := corev1.EnvVar{
+		Name:  "BROKER_PROPERTIES",
+		Value: "/amq/extra/configmaps/broker-properties/broker.properties",
+	}
+	environments.Create(Spec.Containers, &envPropPath)
+
 	//add empty-dir volume and volumeMounts to main container
 	volumeForCfg := volumes.MakeVolumeForCfg(cfgVolumeName)
 	Spec.Volumes = append(Spec.Volumes, volumeForCfg)
@@ -2025,6 +2044,27 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM) corev1.PodTemplateSpec {
 	pts.Spec = Spec
 
 	return pts
+}
+
+func updateBrokerPropertiesConfigMap(fsm *ActiveMQArtemisFSM) {
+
+	configMapName := types.NamespacedName{
+		Namespace: fsm.customResource.Namespace,
+		Name:      namer.CrToBpCM(fsm.customResource.Name),
+	}
+
+	clog.Info("retreving broker properties", "configmap", configMapName)
+	configMapForProperties := &corev1.ConfigMap{}
+	if err := resources.Retrieve(configMapName, fsm.r.Client, configMapForProperties); err == nil {
+		configMapForProperties.Data = brokerPropertiesData(fsm.customResource.Spec.BrokerProperties)
+		if err := resources.Update(configMapName, fsm.r.Client, configMapForProperties); err == nil {
+			clog.Info("Config map updated!")
+		} else {
+			clog.Error(err, "failed to update configmap", "configmap", configMapForProperties)
+		}
+	} else {
+		clog.Error(err, "failed to retrieve configmap")
+	}
 }
 
 func addExtraMountForBrokerPropertiesConfigMap(fsm *ActiveMQArtemisFSM) {

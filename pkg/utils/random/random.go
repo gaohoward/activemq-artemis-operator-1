@@ -20,3 +20,13 @@ func GenerateRandomString(n int) string {
 	}
 	return string(b)
 }
+
+func GenerateRandomBytes(length int) []byte {
+	if !initialised {
+		rand.Seed(time.Now().UnixNano())
+		initialised = true
+	}
+	b := make([]byte, length)
+	rand.Read(b)
+	return b
+}

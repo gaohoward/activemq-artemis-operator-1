@@ -90,11 +90,6 @@ type ActiveMQArtemisReconcilerImpl struct {
 	statefulSetUpdates uint32
 }
 
-type ValueInfo struct {
-	Value   string
-	AutoGen bool
-}
-
 type ActiveMQArtemisIReconciler interface {
 	Process(fsm *ActiveMQArtemisFSM, client rtclient.Client, scheme *runtime.Scheme, firstTime bool) uint32
 	ProcessStatefulSet(fsm *ActiveMQArtemisFSM, client rtclient.Client, log logr.Logger, firstTime bool) (*appsv1.StatefulSet, bool)
@@ -272,69 +267,88 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessCredentials(fsm *ActiveM
 	var log = ctrl.Log.WithName("controller_v1beta1activemqartemis")
 	log.V(1).Info("ProcessCredentials")
 
-	envVars := make(map[string]ValueInfo)
+	containerEnvVars := make(map[string]*common.ValueInfo)
 
-	adminUser := ValueInfo{
-		"",
-		false,
+	adminUser, err := common.NewValueInfo("AMQ_USER", "", false, true)
+	if err != nil {
+		log.Error(err, "failed to create admin user")
 	}
-	adminPassword := ValueInfo{
-		"",
-		false,
+
+	adminPassword, err := common.NewValueInfo("AMQ_PASSWORD", "", false, true)
+	if err != nil {
+		log.Error(err, "failed to create admin password")
 	}
+
 	// TODO: Remove singular admin level user and password in favour of at least guest and admin access
 	secretName := fsm.GetCredentialsSecretName()
 	envVarName1 := "AMQ_USER"
 	for {
-		adminUser.Value = fsm.customResource.Spec.AdminUser
-		if "" != adminUser.Value {
+		adminUser.SetValue(fsm.customResource.Spec.AdminUser)
+		if !adminUser.IsValueEmpty() {
 			break
 		}
 
 		if amqUserEnvVar := environments.Retrieve(currentStatefulSet.Spec.Template.Spec.Containers, "AMQ_USER"); nil != amqUserEnvVar {
-			adminUser.Value = amqUserEnvVar.Value
-		}
-		if "" != adminUser.Value {
-			break
+			adminUser.SetValue(amqUserEnvVar.Value)
+			if !adminUser.IsValueEmpty() {
+				break
+			}
 		}
 
-		adminUser.Value = environments.Defaults.AMQ_USER
+		adminUser.SetValue(environments.Defaults.AMQ_USER)
 		adminUser.AutoGen = true
 		break
 	} // do once
-	envVars[envVarName1] = adminUser
+	containerEnvVars[envVarName1] = adminUser
 
 	envVarName2 := "AMQ_PASSWORD"
 	for {
-		adminPassword.Value = fsm.customResource.Spec.AdminPassword
-		if "" != adminPassword.Value {
+		adminPassword.SetValue(fsm.customResource.Spec.AdminPassword)
+		if !adminPassword.IsValueEmpty() {
 			break
 		}
 
 		if amqPasswordEnvVar := environments.Retrieve(currentStatefulSet.Spec.Template.Spec.Containers, "AMQ_PASSWORD"); nil != amqPasswordEnvVar {
-			adminPassword.Value = amqPasswordEnvVar.Value
-		}
-		if "" != adminPassword.Value {
-			break
+			adminPassword.SetValue(amqPasswordEnvVar.Value)
+			if !adminPassword.IsValueEmpty() {
+				break
+			}
 		}
 
-		adminPassword.Value = environments.Defaults.AMQ_PASSWORD
+		adminPassword.SetValue(environments.Defaults.AMQ_PASSWORD)
 		adminPassword.AutoGen = true
 		break
 	} // do once
-	envVars[envVarName2] = adminPassword
+	containerEnvVars[envVarName2] = adminPassword
 
-	envVars["AMQ_CLUSTER_USER"] = ValueInfo{
-		Value:   environments.GLOBAL_AMQ_CLUSTER_USER,
-		AutoGen: true,
+	clusterUser, err := common.NewValueInfo("AMQ_CLUSTER_USER", environments.GLOBAL_AMQ_CLUSTER_USER, true, true)
+	if err != nil {
+		log.Error(err, "failed to get cluster user name")
 	}
-	envVars["AMQ_CLUSTER_PASSWORD"] = ValueInfo{
-		Value:   environments.GLOBAL_AMQ_CLUSTER_PASSWORD,
-		AutoGen: true,
+	containerEnvVars["AMQ_CLUSTER_USER"] = clusterUser
+
+	clusterPassword, err := common.NewValueInfo("AMQ_CLUSTER_PASSWORD", environments.GLOBAL_AMQ_CLUSTER_PASSWORD, true, true)
+	if err != nil {
+		log.Error(err, "failed to get cluster password")
 	}
-	statefulSetUpdates := sourceEnvVarFromSecret2(fsm, currentStatefulSet, &envVars, secretName, client, scheme)
+	containerEnvVars["AMQ_CLUSTER_PASSWORD"] = clusterPassword
+
+	statefulSetUpdates := sourceEnvVarFromSecret2(fsm, currentStatefulSet, &containerEnvVars, secretName, client, scheme)
+
+	//debug
+	log.Info("8888 after credential processed 8888")
+	dumpSensitiveValuesForDebug(containerEnvVars)
 
 	return statefulSetUpdates
+}
+
+func dumpSensitiveValuesForDebug(envvars map[string]*common.ValueInfo) {
+	envVarNames := []string{"AMQ_USER", "AMQ_PASSWORD", "AMQ_CLUSTER_USER", "AMQ_CLUSTER_PASSWORD"}
+	for _, varName := range envVarNames {
+		if val, ok := envvars[varName]; ok {
+			val.DumpInfo()
+		}
+	}
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessDeploymentPlan(fsm *ActiveMQArtemisFSM, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet, firstTime bool) uint32 {
@@ -659,7 +673,7 @@ func sourceEnvVarFromSecret(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1.
 	return retVal
 }
 
-func sourceEnvVarFromSecret2(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1.StatefulSet, envVars *map[string]ValueInfo, secretName string, client rtclient.Client, scheme *runtime.Scheme) uint32 {
+func sourceEnvVarFromSecret2(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1.StatefulSet, envVars *map[string]*common.ValueInfo, secretName string, client rtclient.Client, scheme *runtime.Scheme) uint32 {
 
 	var log = ctrl.Log.WithName("controller_v1beta1activemqartemis")
 
@@ -673,7 +687,8 @@ func sourceEnvVarFromSecret2(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1
 	// Attempt to retrieve the secret
 	stringDataMap := make(map[string]string)
 	for k := range *envVars {
-		stringDataMap[k] = (*envVars)[k].Value
+		val := (*envVars)[k]
+		stringDataMap[k] = val.GetValue()
 	}
 
 	secretDefinition := secrets.NewSecret(namespacedName, secretName, stringDataMap, fsm.namers.LabelBuilder.Labels())
@@ -691,14 +706,25 @@ func sourceEnvVarFromSecret2(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1
 		// Check the contents against what we just got above
 		log.V(1).Info("Found secret " + secretName)
 
+		//Note if we use encrypted data, what about backward compatibilties
+		//i.e. existing/old deployments have plaintext in the secret.
+		//need a reliable way to detect whether a value from the secret is plaintext or ciphertext
+
 		var needUpdate bool = false
 		for k := range *envVars {
-			elem, ok := secretDefinition.Data[k]
-			if 0 != strings.Compare(string(elem), (*envVars)[k].Value) || !ok {
+			elem, ok := secretDefinition.StringData[k]
+			val := (*envVars)[k]
+			if 0 != strings.Compare(elem, val.GetValue()) || !ok {
 				log.V(1).Info("Secret exists but not equals, or not ok", "ok?", ok)
-				if !(*envVars)[k].AutoGen || string(elem) == "" {
-					secretDefinition.Data[k] = []byte((*envVars)[k].Value)
+				if !(*envVars)[k].AutoGen || elem == "" {
+					secretDefinition.StringData[k] = val.GetValue()
 					needUpdate = true
+				} else {
+					//use the values in secret
+					log.V(1).Info("Auto gen is true and value is not empty in secret, use the secret", "var name", (*envVars)[k].Name)
+					(*envVars)[k].SetValue(elem)
+					plainValue, _ := (*envVars)[k].GetPlainValue()
+					log.Info("***** Now valued updated from seceret", "var name", (*envVars)[k].Name, "val", plainValue)
 				}
 			}
 		}
@@ -708,6 +734,10 @@ func sourceEnvVarFromSecret2(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1
 
 			// These updates alone do not trigger a rolling update due to env var update as it's from a secret
 			err = resources.Update(namespacedName, client, secretDefinition)
+
+			if err != nil {
+				log.Error(err, "failed to update secret")
+			}
 
 			// Force the rolling update to occur
 			environments.IncrementTriggeredRollCount(currentStatefulSet.Spec.Template.Spec.Containers)
@@ -748,6 +778,35 @@ func sourceEnvVarFromSecret2(fsm *ActiveMQArtemisFSM, currentStatefulSet *appsv1
 		}
 	}
 
+	arg := currentStatefulSet.Spec.Template.Spec.InitContainers[0].Args[1]
+	log.Info("----adding params", "arg", arg)
+	// launch.sh parameters
+	// $1 : if set no-start, don't start (used by drainer.sh)
+	// $2 : base64 encoded amq-user
+	// $3 : base64 encoded amq-password
+	// $4 : base64 encoded amq-cluster-user
+	// $5 : base64 encoded amq-cluster-password
+	// Note this way an intruder still can get the yaml to get the plain values (thou base64 encoded)
+	var params string = " placeholder "
+	envVarNames := []string{"AMQ_USER", "AMQ_PASSWORD", "AMQ_CLUSTER_USER", "AMQ_CLUSTER_PASSWORD"}
+	for _, varName := range envVarNames {
+		clog.Info("checking var " + varName)
+		encrypted, ok := (*envVars)[varName]
+		if !ok {
+			panic("cannot find var in map: " + varName)
+		}
+		plaintext, err := encrypted.GetPlainValue()
+		if err != nil {
+			clog.Error(err, "failed to decrypt content", "var", varName)
+			panic("failed to decrypt " + varName)
+		}
+		clog.Info("the tru value for " + varName + " is " + plaintext)
+		params += common.Base64Encode([]byte(plaintext))
+		params += " "
+		clog.Info("params now " + params)
+	}
+	newConfigCmd := strings.Replace(arg, configCmd, configCmd+params, 1)
+	currentStatefulSet.Spec.Template.Spec.InitContainers[0].Args[1] = newConfigCmd
 	return retVal
 }
 
@@ -1903,7 +1962,7 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM) corev1.PodTemplateSpec {
 			yacfgProfileVersion + "/default_with_user_address_settings.yaml.jinja2  --tune " +
 			outputDir + "/broker.yaml --extra-properties '" + jsonSpecials + "' --output " + outputDir
 
-		clog.Info("==debug==, initCmd: " + initCmd)
+		clog.V(1).Info("==debug==, initCmd: " + initCmd)
 		initCmds = append(initCmds, initCmd)
 
 		//populate args of init container
@@ -1982,6 +2041,7 @@ func NewPodTemplateSpecForCR(fsm *ActiveMQArtemisFSM) corev1.PodTemplateSpec {
 	var strBuilder strings.Builder
 
 	isFirst := true
+
 	initCmds = append(initCmds, configCmd)
 	initCmds = append(initCmds, brokerHandlerCmds...)
 	initCmds = append(initCmds, initHelperScript)

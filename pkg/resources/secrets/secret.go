@@ -63,6 +63,22 @@ func NewSecret(namespacedName types.NamespacedName, secretName string, stringDat
 	return &secretDefinition
 }
 
+func NewBinarySecret(namespacedName types.NamespacedName, secretName string, binData map[string][]byte, labels map[string]string) *corev1.Secret {
+	secretDefinition := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    labels,
+			Name:      secretName,
+			Namespace: namespacedName.Namespace,
+		},
+		Data: binData,
+	}
+	return &secretDefinition
+}
+
 func CreateOrUpdate(owner metav1.Object, namespacedName types.NamespacedName, stringDataMap map[string]string, labels map[string]string, client client.Client, scheme *runtime.Scheme) error {
 
 	var err error = nil

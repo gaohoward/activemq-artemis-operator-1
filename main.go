@@ -30,6 +30,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -49,6 +50,7 @@ import (
 
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/sdkk8sutil"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/encrypt"
 	routev1 "github.com/openshift/api/route/v1"
 
 	brokerv1alpha1 "github.com/artemiscloud/activemq-artemis-operator/api/v1alpha1"
@@ -188,8 +190,6 @@ func main() {
 		autodetect.Start()
 	}
 
-	common.SetManager(mgr)
-
 	// Set the service account name for the drainer pod
 	// It will be broken without this as it won't have
 	// permission to list the endpoints in drain.sh
@@ -201,6 +201,18 @@ func main() {
 	} else {
 		setupAccountName(clnt, ctx, oprNameSpace, name)
 	}
+
+	common.SetManager(mgr)
+	secretName := types.NamespacedName{
+		Name:      "manager-encryption-data-secret",
+		Namespace: oprNameSpace,
+	}
+	encrypter, err := encrypt.NewPasswordEncrypter(secretName, clnt)
+	if err != nil {
+		log.Error(err, "failed to create password encrypter")
+		os.Exit(1)
+	}
+	common.SetEncrypter(encrypter)
 
 	if err = (&controllers.ActiveMQArtemisReconciler{
 		Client: mgr.GetClient(),

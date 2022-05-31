@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	goruntime "runtime"
 	"strconv"
 
 	mgmt "github.com/artemiscloud/activemq-artemis-management"
@@ -73,6 +74,9 @@ type ActiveMQArtemisAddressReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *ActiveMQArtemisAddressReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	goruntime.LockOSThread()
+	defer goruntime.UnlockOSThread()
+
 	reqLogger := log.FromContext(ctx).WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ActiveMQArtemisAddress")
 
@@ -584,6 +588,9 @@ func GetStatefulSetNameForPod(pod *types.NamespacedName) (string, int, map[strin
 }
 
 func setupAddressObserver(mgr manager.Manager, c chan types.NamespacedName) {
+	goruntime.LockOSThread()
+	defer goruntime.UnlockOSThread()
+
 	glog.Info("Setting up address observer")
 
 	kubeClient, err := kubernetes.NewForConfig(mgr.GetConfig())

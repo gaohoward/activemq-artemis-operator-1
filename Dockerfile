@@ -24,7 +24,7 @@ COPY version/ version/
 COPY entrypoint/ entrypoint/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o /tmp/activemq-artemis-operator/${BROKER_NAME}-operator main.go
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -o /tmp/activemq-artemis-operator/${BROKER_NAME}-operator main.go
 
 FROM registry.access.redhat.com/ubi8:8.6-754 AS base-env
 

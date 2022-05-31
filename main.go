@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	goruntime "runtime"
 	"sort"
 	"strings"
 
@@ -40,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"fmt"
-	goruntime "runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +51,7 @@ import (
 
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/sdkk8sutil"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/thread"
 
 	brokerv1alpha1 "github.com/artemiscloud/activemq-artemis-operator/api/v1alpha1"
 	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
@@ -98,6 +99,9 @@ func init() {
 }
 
 func main() {
+	goruntime.LockOSThread()
+	defer goruntime.UnlockOSThread()
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -112,7 +116,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	ctrl.SetLogger(thread.WrapLog(zap.New(zap.UseFlagOptions(&opts)), 0))
 
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()

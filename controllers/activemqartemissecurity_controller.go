@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"reflect"
+	goruntime "runtime"
 
 	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources"
@@ -61,6 +62,9 @@ type ActiveMQArtemisSecurityReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *ActiveMQArtemisSecurityReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+
+	goruntime.LockOSThread()
+	defer goruntime.UnlockOSThread()
 
 	reqLogger := ctrl.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ActiveMQArtemisSecurity")

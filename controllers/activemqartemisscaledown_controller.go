@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"io/ioutil"
+	goruntime "runtime"
 	"time"
 
 	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
@@ -69,6 +70,9 @@ type ActiveMQArtemisScaledownReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *ActiveMQArtemisScaledownReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	goruntime.LockOSThread()
+	defer goruntime.UnlockOSThread()
+
 	reqLogger := ctrl.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ActiveMQArtemisScaledown")
 

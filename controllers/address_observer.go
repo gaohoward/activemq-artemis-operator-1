@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"time"
 
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
@@ -74,6 +75,9 @@ func (c *AddressObserver) Run(C chan types.NamespacedName) error {
 //and if multiple statefulsets exists while the property
 //is not specified, apply to all pods)
 func (c *AddressObserver) newPodReady(ready *types.NamespacedName) {
+
+	goruntime.LockOSThread()
+	defer goruntime.UnlockOSThread()
 
 	olog.Info("New pod ready.", "Pod", ready)
 

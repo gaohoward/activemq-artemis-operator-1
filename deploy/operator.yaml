@@ -73,7 +73,7 @@ spec:
           value: quay.io/artemiscloud/activemq-artemis-broker-kubernetes:1.0.3
         - name: ENABLE_WEBHOOKS
           value: "false"
-        image: quay.io/artemiscloud/activemq-artemis-operator:dev.latest
+        image: quay.io/hgao/operator:5930
         livenessProbe:
           httpGet:
             path: /healthz

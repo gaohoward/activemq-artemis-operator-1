@@ -2544,6 +2544,56 @@ var _ = Describe("artemis controller", func() {
 	})
 })
 
+var _ = Describe("artemis controller do test", Label("do"), func() {
+
+	Context("Redistribution-delay address settings test", func() {
+		It("Deploy broker with new address settings", func() {
+			By("By creating a crd without address spec")
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+
+			// add address settings, to an existing crd
+			ma := "merge_all"
+			redistributionDelay := int32(100)
+
+			crd.Spec.AddressSettings = brokerv1beta1.AddressSettingsType{
+				ApplyRule: &ma,
+				AddressSetting: []brokerv1beta1.AddressSettingType{
+					{
+						Match:               "#",
+						RedistributionDelay: &redistributionDelay,
+					},
+				},
+			}
+			By("Deploying the CRD " + crd.ObjectMeta.Name)
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+
+			By("Making sure that the CRD gets deployed " + crd.ObjectMeta.Name)
+			Eventually(func() bool {
+				return getPersistedVersionedCrd(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+			}, existingClusterTimeout, existingClusterInterval).Should(BeTrue())
+
+			By("Expecting that the pod is up and running")
+			Eventually(func(g Gomega) {
+				getPersistedVersionedCrd(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+				g.Expect(len(createdCrd.Status.PodStatus.Ready)).Should(BeEquivalentTo(1))
+
+			}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+			// cleanup
+			Expect(k8sClient.Delete(ctx, createdCrd)).Should(Succeed())
+			By("check it has gone")
+			Eventually(func() bool {
+				return checkCrdDeleted(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+			}, existingClusterTimeout, existingClusterInterval).Should(BeTrue())
+
+		})
+	})
+
+})
+
 func generateArtemisSpec(namespace string) brokerv1beta1.ActiveMQArtemis {
 
 	spec := brokerv1beta1.ActiveMQArtemisSpec{}

@@ -65,10 +65,16 @@ func (r *ActiveMQArtemisReconciler) UpdatePodForSecurity(securityHandlerNamespac
 			if handler.IsApplicableFor(candidate) {
 				clog.Info("force reconcile for security", "handler", securityHandlerNamespacedName, "CR", candidate)
 				r.events <- event.GenericEvent{Object: &artemis}
+				r.InterruptReconcile(&artemis)
 			}
 		}
 	}
 	return err
+}
+
+func (r *ActiveMQArtemisReconciler) InterruptReconcile(targetCr *brokerv1beta1.ActiveMQArtemis) {
+	clog.V(1).Info("Interrupting reconcile", "for", targetCr)
+	//how to, delete ss?
 }
 
 func (r *ActiveMQArtemisReconciler) RemoveBrokerConfigHandler(namespacedName types.NamespacedName) {

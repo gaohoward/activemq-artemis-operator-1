@@ -115,6 +115,9 @@ test-mk: manifests generate fmt vet envtest ## Run tests against minikube with l
 test-mk-do: manifests generate fmt vet envtest ## Run tests against minikube with deployed operator(do)
 	DEPLOY_OPERATOR=true USE_EXISTING_CLUSTER=true ENABLE_WEBHOOKS=false go test  ./controllers/... -ginkgo.v -ginkgo.label-filter="do"
 
+test-simple: manifests generate fmt vet envtest
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test  ./controllers/... -ginkgo.v -ginkgo.label-filter="simple" $(TEST_ARGS) -coverprofile cover.out
+
 ##@ Build
 
 build: generate fmt vet ## Build manager binary.

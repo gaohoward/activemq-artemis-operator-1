@@ -64,6 +64,110 @@ import (
 //	RunSpecs(t, "Artemis Controller Suite")
 //}
 
+var boolFalse = false
+var boolTrue = true
+
+var _ = Describe("Simple test", Label("simple"), func() {
+
+	Context("security test", func() {
+		It("deploy broker with custom readiness probe that relies on security", func() {
+			By("Creating broker")
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+
+			crd.Spec.AdminUser = "admin"
+			crd.Spec.AdminPassword = "secret"
+			crd.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+				Handler: corev1.Handler{
+					Exec: &corev1.ExecAction{
+						Command: []string{
+							"/home/jboss/amq-broker/bin/artemis",
+							"check queue",
+							"--name readinessqueue",
+							"--produce 1",
+							"--consume 1",
+							"--silent",
+							"--user batch-user",
+							"--password mysecret",
+						},
+					},
+				},
+				InitialDelaySeconds: 30,
+				TimeoutSeconds:      5,
+			}
+			crd.Spec.DeploymentPlan.Size = 1
+			crd.Spec.DeploymentPlan.Clustered = &boolFalse
+			crd.Spec.DeploymentPlan.RequireLogin = boolTrue
+			crd.Spec.DeploymentPlan.JolokiaAgentEnabled = false
+			crd.Spec.Acceptors = []brokerv1beta1.AcceptorType{
+				{
+					Name:      "internal",
+					Protocols: "core,openwire",
+					Port:      61616,
+				},
+			}
+
+			By("Deploying the CRD " + crd.ObjectMeta.Name)
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+			createdSs := &appsv1.StatefulSet{}
+
+			By("Making sure that the CRD gets deployed " + crd.ObjectMeta.Name)
+			Eventually(func() bool {
+				return getPersistedVersionedCrd(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+			}, timeout, interval).Should(BeTrue())
+			Expect(createdCrd.Name).Should(Equal(crd.ObjectMeta.Name))
+
+			By("Checking that Stateful Set is Created " + namer.CrToSS(createdCrd.Name))
+			Eventually(func() bool {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+				err := k8sClient.Get(ctx, key, createdSs)
+				return err == nil
+			}, timeout, interval).Should(Equal(true))
+
+			By("Deploying security")
+			secCrd, createdSecCrd := DeploySecurity("", defaultNamespace, func(secCrdToDeploy *brokerv1beta1.ActiveMQArtemisSecurity) {
+			})
+
+			fmt.Printf("ori: %v created: %v", secCrd, createdSecCrd)
+
+			By("Checking that Stateful Set is updated " + namer.CrToSS(createdCrd.Name))
+			Eventually(func() bool {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+				err := k8sClient.Get(ctx, key, createdSs)
+				if err != nil {
+					return false
+				}
+
+				initContainer := createdSs.Spec.Template.Spec.InitContainers[0]
+				securityFound := false
+				for _, argStr := range initContainer.Args {
+					fmt.Println("Checking arg str === " + argStr)
+					if strings.Contains(argStr, "/opt/amq-broker/script/cfg/config-security.sh") {
+						securityFound = true
+						break
+					}
+				}
+				return securityFound
+			}, timeout, interval).Should(BeTrue())
+			fmt.Printf("scrCrd %v created %v", secCrd, createdSecCrd)
+
+			By("check it has gone")
+			Expect(k8sClient.Delete(ctx, createdCrd)).To(Succeed())
+			Eventually(func() bool {
+				return checkCrdDeleted(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(k8sClient.Delete(ctx, createdSecCrd)).To(Succeed())
+			Eventually(func() bool {
+				return checkCrdDeleted(secCrd.Name, defaultNamespace, createdSecCrd)
+			}, timeout, interval).Should(BeTrue())
+
+		})
+	})
+})
+
 var _ = Describe("artemis controller", func() {
 
 	// Define utility constants for object names and testing timeouts/durations and intervals.

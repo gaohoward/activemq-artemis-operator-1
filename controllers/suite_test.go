@@ -48,6 +48,7 @@ import (
 
 	nsoptions "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/namespaces"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/thread"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,12 +93,18 @@ var oprRes = []string{
 }
 
 func TestAPIs(t *testing.T) {
+	opts := zap.Options{
+		Development: true,
+	}
+	ctrl.SetLogger(thread.WrapLog(zap.New(zap.UseFlagOptions(&opts)), 0))
+
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
 }
 
 func setUpEnvTest() {
+
 	// for run in ide
 	// os.Setenv("KUBEBUILDER_ASSETS", " .. <path from makefile> /kubebuilder-envtest/k8s/1.22.1-linux-amd64")
 	By("bootstrapping test environment")

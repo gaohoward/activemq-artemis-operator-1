@@ -41,6 +41,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/artemiscloud/activemq-artemis-operator/version"
 	appsv1 "k8s.io/api/apps/v1"
@@ -105,6 +106,46 @@ var _ = Describe("artemis controller", func() {
 		if wi != nil {
 			wi.Stop()
 		}
+	})
+
+	Context("operator upgrade", func() {
+		It("olm upgrade when new broker image is present", Label("upgrade-with-olm"), func() {
+			By("install an old version of fake broker image")
+			fakeOldImage := "quay.io/artemiscloud/activemq-artemis-broker-kubernetes:old"
+			os.Setenv("RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_"+version.CompactLatestVersion, fakeOldImage)
+			defer func() {
+				os.Unsetenv("RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_" + version.CompactLatestVersion)
+			}()
+
+			By("deploy broker with upgrade set to true")
+			cr, createdCr := DeployCustomBroker("ex-aao", defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+				candidate.Spec.Upgrades.Enabled = true
+				candidate.Spec.Upgrades.Minor = true
+			})
+			Eventually(func(g Gomega) {
+				ss := GetStatefulSetForCr("ex-aao", defaultNamespace)
+				g.Expect(ss.Spec.Template.Spec.Containers[0].Image).To(Equal(fakeOldImage))
+			}, timeout, interval).Should(Succeed())
+
+			By("simulate operaor update by olm")
+			fakeNewImage := "quay.io/artemiscloud/activemq-artemis-broker-kubernetes:new"
+			os.Setenv("RELATED_IMAGE_ActiveMQ_Artemis_Broker_Kubernetes_"+version.CompactLatestVersion, fakeNewImage)
+			//clean up the map
+			namespacedNameToFSM = make(map[types.NamespacedName]*ActiveMQArtemisFSM)
+
+			brokerReconciler.events <- event.GenericEvent{Object: createdCr}
+
+			By("Checking the statefulset get updated")
+			Eventually(func(g Gomega) {
+				ss := GetStatefulSetForCr("ex-aao", defaultNamespace)
+				g.Expect(ss.Spec.Template.Spec.Containers[0].Image).To(Equal(fakeNewImage))
+			}, timeout, interval).Should(Succeed())
+
+			By("check resources deleted")
+			Eventually(func() bool {
+				return checkCrdDeleted(cr.Name, defaultNamespace, createdCr)
+			}, timeout, interval).Should(BeTrue())
+		})
 	})
 
 	Context("New address settings options", func() {
@@ -3116,7 +3157,9 @@ func DeployCustomBroker(crName string, targetNamespace string, customFunc func(c
 
 	brokerCrd.Spec.DeploymentPlan.Size = 1
 
-	customFunc(&brokerCrd)
+	if customFunc != nil {
+		customFunc(&brokerCrd)
+	}
 
 	Expect(k8sClient.Create(ctx, &brokerCrd)).Should(Succeed())
 
@@ -3128,4 +3171,18 @@ func DeployCustomBroker(crName string, targetNamespace string, customFunc func(c
 	Expect(createdBrokerCrd.Name).Should(Equal(createdBrokerCrd.ObjectMeta.Name))
 
 	return &brokerCrd, &createdBrokerCrd
+}
+
+func GetStatefulSetForCr(crName string, namespace string) *appsv1.StatefulSet {
+
+	key := types.NamespacedName{
+		Name:      namer.CrToSS(crName),
+		Namespace: namespace,
+	}
+
+	ss := &appsv1.StatefulSet{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, key, ss)).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
+	return ss
 }

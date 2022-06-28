@@ -31,9 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources"
 	nsoptions "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/namespaces"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/lsrcrs"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/selectors"
 )
 
@@ -208,12 +210,17 @@ func (r *ActiveMQArtemisReconciler) Reconcile(ctx context.Context, request ctrl.
 				}
 			}
 			if lsrcr.Checksum == customResource.ResourceVersion {
-				//this is an operator restart. Don't do reconcile
-				namespacedNameToFSM[namespacedName] = fsm
-				reqLogger.Info("Detected possible operator restart with no broker CR changes", "res", customResource.ResourceVersion)
-				return r.Result, nil
+				//this is an operator restart. Don't do reconcile unless upgrade is enabled
+				if !r.needUpgrade(customResource, request.Namespace) {
+					namespacedNameToFSM[namespacedName] = fsm
+					reqLogger.Info("Detected possible operator restart with no broker CR changes", "res", customResource.ResourceVersion)
+					return r.Result, nil
+				} else {
+					reqLogger.Info("Broker image need to upgrade")
+				}
+			} else {
+				reqLogger.Info("A new version of CR comes in", "old", lsrcr.Checksum, "new", customResource.ResourceVersion)
 			}
-			reqLogger.Info("A new version of CR comes in", "old", lsrcr.Checksum, "new", customResource.ResourceVersion)
 		}
 	}
 
@@ -258,6 +265,33 @@ func GetDefaultLabels(cr *brokerv1beta1.ActiveMQArtemis) map[string]string {
 	defaultLabelData := selectors.LabelerData{}
 	defaultLabelData.Base(cr.Name).Suffix("app").Generate()
 	return defaultLabelData.Labels()
+}
+
+func (r *ActiveMQArtemisReconciler) needUpgrade(cr *brokerv1beta1.ActiveMQArtemis, namespace string) bool {
+
+	if !cr.Spec.Upgrades.Enabled {
+		clog.Info("Custom resource upgrade not enabled")
+		return false
+	}
+
+	key := types.NamespacedName{
+		Name:      namer.CrToSS(cr.Name),
+		Namespace: namespace,
+	}
+	ss := &appsv1.StatefulSet{}
+	if err := resources.Retrieve(key, r.Client, ss); err != nil {
+		//any error will cause upgrade
+		clog.Error(err, "failed to retrieve statefulset for upgrade check")
+		return true
+	}
+	newInitImage := determineImageToUse(cr, "Init")
+	newBrokerImage := determineImageToUse(cr, "Kubernetes")
+
+	oldInitImage := ss.Spec.Template.Spec.Containers[0].Image
+	oldBrokerImage := ss.Spec.Template.Spec.InitContainers[0].Image
+
+	clog.V(1).Info("Got images to compare", "old init", oldInitImage, "new init", newInitImage, "old broker", oldBrokerImage, "new broker", newBrokerImage)
+	return newBrokerImage != oldBrokerImage || newInitImage != oldInitImage
 }
 
 type StatefulSetInfo struct {

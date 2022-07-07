@@ -19,6 +19,7 @@ As usual, we start with the necessary imports. We also define some utility varia
 package controllers
 
 import (
+	"bytes"
 	"container/list"
 	"context"
 	"fmt"
@@ -3303,6 +3304,147 @@ var _ = Describe("artemis controller", func() {
 		}
 	})
 
+	It("deploy broker with custom readiness probe that relies on security", Label("security-when-broker-not-ready"), func() {
+		By("Creating broker")
+		ctx := context.Background()
+		crd := generateArtemisSpec(defaultNamespace)
+
+		crd.Spec.AdminUser = "admin"
+		crd.Spec.AdminPassword = "secret"
+		crd.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			Handler: corev1.Handler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/home/jboss/amq-broker/bin/artemis",
+						"check queue",
+						"--name readinessqueue",
+						"--produce 1",
+						"--consume 1",
+						"--silent",
+						"--user batch-user",
+						"--password mysecret",
+					},
+				},
+			},
+			InitialDelaySeconds: 30,
+			TimeoutSeconds:      5,
+		}
+		crd.Spec.DeploymentPlan.Size = 1
+		crd.Spec.DeploymentPlan.Clustered = &boolFalse
+		crd.Spec.DeploymentPlan.RequireLogin = boolTrue
+		crd.Spec.DeploymentPlan.JolokiaAgentEnabled = false
+		crd.Spec.Acceptors = []brokerv1beta1.AcceptorType{
+			{
+				Name:      "internal",
+				Protocols: "core,openwire",
+				Port:      61616,
+			},
+		}
+
+		By("Deploying the CRD " + crd.ObjectMeta.Name)
+		Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+		createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+		createdSs := &appsv1.StatefulSet{}
+
+		By("Making sure that the CRD gets deployed " + crd.ObjectMeta.Name)
+		Eventually(func() bool {
+			return getPersistedVersionedCrd(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+		}, timeout, interval).Should(BeTrue())
+		Expect(createdCrd.Name).Should(Equal(crd.ObjectMeta.Name))
+
+		By("Checking that Stateful Set is Created " + namer.CrToSS(createdCrd.Name))
+		Eventually(func() bool {
+			key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+			err := k8sClient.Get(ctx, key, createdSs)
+			return err == nil
+		}, timeout, interval).Should(Equal(true))
+
+		podWithOrdinal := namer.CrToSS(crd.Name) + "-0"
+
+		By("Checking pod should not be ready")
+		if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+			Eventually(func(g Gomega) {
+				pod := &corev1.Pod{}
+				podKey := types.NamespacedName{
+					Name:      podWithOrdinal,
+					Namespace: defaultNamespace,
+				}
+				g.Expect(k8sClient.Get(ctx, podKey, pod)).Should(Succeed())
+				g.Expect(len(pod.Status.Conditions) > 0).To(BeTrue())
+				for _, cond := range pod.Status.Conditions {
+					if cond.Type == corev1.PodInitialized {
+						g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+					} else if cond.Type == corev1.PodReady || cond.Type == corev1.ContainersReady {
+						//pod should not be ready at this stage
+						g.Expect(cond.Status).ShouldNot(Equal(corev1.ConditionTrue), "type of "+cond.Type+" actual status "+corev1.PodConditionType(cond.Status))
+					} else if cond.Type == corev1.PodScheduled {
+						g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+					}
+				}
+			}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+		}
+
+		By("Deploying security")
+		secCrd, createdSecCrd := DeploySecurity("", defaultNamespace, func(secCrdToDeploy *brokerv1beta1.ActiveMQArtemisSecurity) {
+		})
+
+		fmt.Printf("ori: %v created: %v", secCrd, createdSecCrd)
+
+		By("Checking that Stateful Set is updated " + namer.CrToSS(createdCrd.Name))
+		Eventually(func() bool {
+			key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+			err := k8sClient.Get(ctx, key, createdSs)
+			if err != nil {
+				return false
+			}
+
+			initContainer := createdSs.Spec.Template.Spec.InitContainers[0]
+			securityFound := false
+			for _, argStr := range initContainer.Args {
+				fmt.Println("Checking arg str === " + argStr)
+				if strings.Contains(argStr, "/opt/amq-broker/script/cfg/config-security.sh") {
+					securityFound = true
+					break
+				}
+			}
+			return securityFound
+		}, timeout, interval).Should(BeTrue())
+		fmt.Printf("scrCrd %v created %v", secCrd, createdSecCrd)
+
+		if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+			By("Checking pod conditions should be running now")
+			Eventually(func(g Gomega) {
+				pod := &corev1.Pod{}
+				podKey := types.NamespacedName{
+					Name:      podWithOrdinal,
+					Namespace: defaultNamespace,
+				}
+				g.Expect(k8sClient.Get(ctx, podKey, pod)).Should(Succeed())
+				g.Expect(len(pod.Status.Conditions) > 0).To(BeTrue())
+				for _, cond := range pod.Status.Conditions {
+					if cond.Type == corev1.PodInitialized ||
+						cond.Type == corev1.PodReady ||
+						cond.Type == corev1.ContainersReady ||
+						cond.Type == corev1.PodScheduled {
+						g.Expect(cond.Status).To(Equal(corev1.ConditionTrue), formatPodConditions(pod.Status.Conditions))
+					}
+				}
+			}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+		}
+		By("check it has gone")
+		Expect(k8sClient.Delete(ctx, createdCrd)).To(Succeed())
+		Eventually(func() bool {
+			return checkCrdDeleted(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+		}, timeout, interval).Should(BeTrue())
+
+		Expect(k8sClient.Delete(ctx, createdSecCrd)).To(Succeed())
+		Eventually(func() bool {
+			return checkCrdDeleted(secCrd.Name, defaultNamespace, createdSecCrd)
+		}, timeout, interval).Should(BeTrue())
+
+	})
+
 	It("deploy security cr while broker is not yet ready", func() {
 
 		By("Creating broker with custom probe that relies on security")
@@ -3628,4 +3770,14 @@ func DeployCustomBroker(crName string, targetNamespace string, customFunc func(c
 	Expect(createdBrokerCrd.Namespace).Should(Equal(targetNamespace))
 
 	return &brokerCrd, &createdBrokerCrd
+}
+
+func formatPodConditions(conditions []corev1.PodCondition) string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("Pod conditions(type and status)\n")
+	for _, cond := range conditions {
+		buffer.WriteString(string(cond.Type) + "(" + string(cond.Status) + ")\n")
+	}
+	return buffer.String()
 }

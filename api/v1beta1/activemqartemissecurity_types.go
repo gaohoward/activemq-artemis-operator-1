@@ -36,9 +36,10 @@ type ActiveMQArtemisSecuritySpec struct {
 }
 
 type LoginModulesType struct {
-	PropertiesLoginModules []PropertiesLoginModuleType `json:"propertiesLoginModules,omitempty"`
-	GuestLoginModules      []GuestLoginModuleType      `json:"guestLoginModules,omitempty"`
-	KeycloakLoginModules   []KeycloakLoginModuleType   `json:"keycloakLoginModules,omitempty"`
+	PropertiesLoginModules          []PropertiesLoginModuleType          `json:"propertiesLoginModules,omitempty"`
+	GuestLoginModules               []GuestLoginModuleType               `json:"guestLoginModules,omitempty"`
+	KeycloakLoginModules            []KeycloakLoginModuleType            `json:"keycloakLoginModules,omitempty"`
+	TextFileCertificateLoginModules []TextFileCertificateLoginModuleType `json:"textFileCertificateLoginModules,omitempty"`
 }
 
 type PropertiesLoginModuleType struct {
@@ -46,6 +47,8 @@ type PropertiesLoginModuleType struct {
 	Name  string     `json:"name,omitempty"`
 	Users []UserType `json:"users,omitempty"`
 }
+
+type TextFileCertificateLoginModuleType = PropertiesLoginModuleType
 
 type UserType struct {
 	// User name to be defined in properties login module
@@ -168,6 +171,7 @@ type KeyValueType struct {
 type SecurityDomainsType struct {
 	BrokerDomain  BrokerDomainType `json:"brokerDomain,omitempty"`
 	ConsoleDomain BrokerDomainType `json:"consoleDomain,omitempty"`
+	CertDomain    BrokerDomainType `json:"certDomain,omitempty"`
 }
 
 type BrokerDomainType struct {

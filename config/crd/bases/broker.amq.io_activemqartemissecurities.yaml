@@ -591,10 +591,64 @@ spec:
                           type: array
                       type: object
                     type: array
+                  textFileCertificateLoginModules:
+                    items:
+                      properties:
+                        name:
+                          description: Name for PropertiesLoginModule
+                          type: string
+                        users:
+                          items:
+                            properties:
+                              name:
+                                description: User name to be defined in properties
+                                  login module
+                                type: string
+                              password:
+                                description: Password to be defined in properties
+                                  login module
+                                type: string
+                              roles:
+                                description: Roles to be defined in properties login
+                                  module
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
                 type: object
               securityDomains:
                 properties:
                   brokerDomain:
+                    properties:
+                      loginModules:
+                        items:
+                          properties:
+                            debug:
+                              description: Debug option of login modules for broker/console
+                                domain
+                              type: boolean
+                            flag:
+                              description: Flag of login modules for broker/console
+                                domain
+                              type: string
+                            name:
+                              description: Name for login modules for broker/console
+                                domain
+                              type: string
+                            reload:
+                              description: Reload option of login modules for broker/console
+                                domain
+                              type: boolean
+                          type: object
+                        type: array
+                      name:
+                        description: Name for the broker/console domain
+                        type: string
+                    type: object
+                  certDomain:
                     properties:
                       loginModules:
                         items:

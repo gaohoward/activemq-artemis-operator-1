@@ -48,7 +48,11 @@ type PropertiesLoginModuleType struct {
 	Users []UserType `json:"users,omitempty"`
 }
 
-type TextFileCertificateLoginModuleType = PropertiesLoginModuleType
+type TextFileCertificateLoginModuleType struct {
+	// Name for PropertiesLoginModule
+	Name  string     `json:"name,omitempty"`
+	Users []UserType `json:"users,omitempty"`
+}
 
 type UserType struct {
 	// User name to be defined in properties login module

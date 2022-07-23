@@ -1556,7 +1556,7 @@ func (in *LoginModulesType) DeepCopyInto(out *LoginModulesType) {
 	}
 	if in.TextFileCertificateLoginModules != nil {
 		in, out := &in.TextFileCertificateLoginModules, &out.TextFileCertificateLoginModules
-		*out = make([]PropertiesLoginModuleType, len(*in))
+		*out = make([]TextFileCertificateLoginModuleType, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

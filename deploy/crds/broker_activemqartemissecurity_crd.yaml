@@ -570,11 +570,11 @@ spec:
                         users:
                           items:
                             properties:
+                              dnName:
+                                description: Password to be defined in properties login module
+                                type: string
                               name:
                                 description: User name to be defined in properties login module
-                                type: string
-                              password:
-                                description: Password to be defined in properties login module
                                 type: string
                               roles:
                                 description: Roles to be defined in properties login module

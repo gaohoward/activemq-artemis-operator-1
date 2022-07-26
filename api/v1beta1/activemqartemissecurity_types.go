@@ -50,8 +50,17 @@ type PropertiesLoginModuleType struct {
 
 type TextFileCertificateLoginModuleType struct {
 	// Name for PropertiesLoginModule
-	Name  string     `json:"name,omitempty"`
-	Users []UserType `json:"users,omitempty"`
+	Name  string         `json:"name,omitempty"`
+	Users []CertUserType `json:"users,omitempty"`
+}
+
+type CertUserType struct {
+	// User name to be defined in properties login module
+	Name string `json:"name,omitempty"`
+	// Password to be defined in properties login module
+	DnName string `json:"dnName,omitempty"`
+	// Roles to be defined in properties login module
+	Roles []string `json:"roles,omitempty"`
 }
 
 type UserType struct {

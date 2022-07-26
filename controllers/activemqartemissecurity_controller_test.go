@@ -63,6 +63,128 @@ var _ = Describe("security controller", func() {
 	})
 
 	Context("Reconcile Test", func() {
+		It("testing cert domain", Label("test-cert-domain"), func() {
+
+			broker1Cr, createdBroker1Cr := DeployBroker("ex-aao", defaultNamespace)
+
+			secCrd, createdSecCrd := DeploySecurity("", defaultNamespace, func(secCrdToDeploy *brokerv1beta1.ActiveMQArtemisSecurity) {
+
+				password1 := "password1"
+				password2 := "password2"
+
+				secCrdToDeploy.Spec.LoginModules = brokerv1beta1.LoginModulesType{
+					PropertiesLoginModules: []brokerv1beta1.PropertiesLoginModuleType{
+						{
+							Name: "module1",
+							Users: []brokerv1beta1.UserType{
+								{
+									Name:     "user1",
+									Password: &password1,
+									Roles: []string{
+										"role1",
+										"role2",
+									},
+								},
+								{
+									Name:     "user2",
+									Password: &password2,
+									Roles: []string{
+										"role3",
+										"role1",
+									},
+								},
+							},
+						},
+					},
+					TextFileCertificateLoginModules: []brokerv1beta1.TextFileCertificateLoginModuleType{
+						{
+							Name: "cert-module",
+							Users: []brokerv1beta1.CertUserType{
+								{
+									Name:   "producer",
+									DnName: "CN=ActiveMQ Artemis Client, OU=Artemis, O=ActiveMQ, L=AMQ, ST=AMQ, C=AMQ",
+									Roles: []string{
+										"producers",
+									},
+								},
+							},
+						},
+					},
+				}
+				brokerDomainName := "activemq"
+				propLoginModuleName := "module1"
+				requiredFlag := "required"
+				trueDebug := true
+				trueReload := true
+				certDomainName := "CertLogin"
+				certModuleName := "cert-module"
+				secCrdToDeploy.Spec.SecurityDomains = brokerv1beta1.SecurityDomainsType{
+					BrokerDomain: brokerv1beta1.BrokerDomainType{
+						Name: &brokerDomainName,
+						LoginModules: []brokerv1beta1.LoginModuleReferenceType{
+							{
+								Name:   &propLoginModuleName,
+								Flag:   &requiredFlag,
+								Debug:  &trueDebug,
+								Reload: &trueReload,
+							},
+						},
+					},
+					CertDomain: brokerv1beta1.BrokerDomainType{
+						Name: &certDomainName,
+						LoginModules: []brokerv1beta1.LoginModuleReferenceType{
+							{
+								Name:  &certModuleName,
+								Flag:  &requiredFlag,
+								Debug: &trueDebug,
+							},
+						},
+					},
+				}
+			})
+
+			requestedSs := &appsv1.StatefulSet{}
+
+			By("Checking security gets applied to broker" + broker1Cr.Name)
+			Eventually(func() bool {
+				key := types.NamespacedName{Name: namer.CrToSS(createdBroker1Cr.Name), Namespace: defaultNamespace}
+				err := k8sClient.Get(ctx, key, requestedSs)
+				if err != nil {
+					return false
+				}
+
+				initContainer := requestedSs.Spec.Template.Spec.InitContainers[0]
+				secApplied := false
+				for _, arg := range initContainer.Args {
+					//the string may span over multiple lines
+					if strings.Contains(arg, "dnname: CN=ActiveMQ Artemis Client,") &&
+						strings.Contains(arg, "OU=Artemis,") &&
+						strings.Contains(arg, "O=ActiveMQ,") &&
+						strings.Contains(arg, "L=AMQ,") &&
+						strings.Contains(arg, "ST=AMQ,") &&
+						strings.Contains(arg, "C=AMQ") &&
+						strings.Contains(arg, "CertLogin") {
+						fmt.Println("***match****")
+						secApplied = true
+						break
+					}
+				}
+				return secApplied
+			}, timeout, interval).Should(BeTrue())
+
+			By("checking resources get removed")
+			Expect(k8sClient.Delete(ctx, broker1Cr)).Should(Succeed())
+			Eventually(func() bool {
+				return checkCrdDeleted(broker1Cr.Name, defaultNamespace, createdBroker1Cr)
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(k8sClient.Delete(ctx, createdSecCrd)).Should(Succeed())
+			Eventually(func() bool {
+				return checkCrdDeleted(secCrd.ObjectMeta.Name, defaultNamespace, createdSecCrd)
+			}, timeout, interval).Should(BeTrue())
+
+		})
+
 		It("testing security applied after broker", Label("security-apply-restart"), func() {
 			By("deploying the broker cr")
 			crd, createdCrd := DeployCustomBroker("", defaultNamespace, func(brokerCrdToDeploy *brokerv1beta1.ActiveMQArtemis) {

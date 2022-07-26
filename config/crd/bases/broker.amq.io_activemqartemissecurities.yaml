@@ -600,12 +600,12 @@ spec:
                         users:
                           items:
                             properties:
-                              name:
-                                description: User name to be defined in properties
+                              dnName:
+                                description: Password to be defined in properties
                                   login module
                                 type: string
-                              password:
-                                description: Password to be defined in properties
+                              name:
+                                description: User name to be defined in properties
                                   login module
                                 type: string
                               roles:

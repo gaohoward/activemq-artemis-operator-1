@@ -40,6 +40,7 @@ type LoginModulesType struct {
 	GuestLoginModules               []GuestLoginModuleType               `json:"guestLoginModules,omitempty"`
 	KeycloakLoginModules            []KeycloakLoginModuleType            `json:"keycloakLoginModules,omitempty"`
 	TextFileCertificateLoginModules []TextFileCertificateLoginModuleType `json:"textFileCertificateLoginModules,omitempty"`
+	LdapLoginModules                []LdapLoginModuleType                `json:"ldapLoginModules,omitempty"`
 }
 
 type PropertiesLoginModuleType struct {
@@ -87,6 +88,86 @@ type KeycloakLoginModuleType struct {
 	// Type of KeycloakLoginModule directAccess or bearerToken
 	ModuleType    *string                         `json:"moduleType,omitempty"`
 	Configuration KeycloakModuleConfigurationType `json:"configuration,omitempty"`
+}
+
+type LdapLoginModuleType struct {
+	// Name for LdapLoginModuleType
+	Name    string                     `json:"name,omitempty"`
+	Options LdapLoginModuleOptionsType `json:"options,omitempty"`
+}
+
+type LdapLoginModuleOptionsType struct {
+
+	// url to be used to connect to ldap server
+	ConnectionUrl string `json:"connectionURL"`
+	// authentication method used when binding to
+	// the LDAP server. Available values are:
+	// `simple` (username and password, default),
+	// `GSSAPI` (Kerberos SASL) or
+	// `none` (anonymous).
+	Authentication *string `json:"authentication,omitempty"`
+	// the DN of the user that opens the connection to the directory server
+	ConnectionUsername *string `json:"connectionUsername,omitempty"`
+	// the password that matches the DN from `connectionUsername`
+	ConnectionPassword *string `json:"connectionPassword,omitempty"`
+	// the scope in JAAS configuration (login.config) to
+	// use to obtain Kerberos initiator credentials when the `authentication` method
+	// is SASL `GSSAPI`. The default value is `broker-sasl-gssapi`
+	SaslLoginConfigScope *string `json:"saslLoginConfigScope,omitempty"`
+	// currently must be empty string
+	ConnectionProtocol *string `json:"connectionProtocol,omitempty"`
+	// enable the LDAP connection pool property
+	// 'com.sun.jndi.ldap.connect.pool'
+	ConnectionPool *string `json:"connectionPool,omitempty"`
+	// the string representation of an integer
+	// representing the connection timeout in milliseconds
+	ConnectionTimeout *string `json:"connectionTimeout,omitempty"`
+	// the string representation of an integer representing
+	// the read timeout in milliseconds for LDAP operations
+	ReadTimeout *string `json:"readTimeout,omitempty"`
+	// selects a particular subtree of the DIT to search for user entries.
+	UserBase *string `json:"userBase,omitempty"`
+	// specifies an LDAP search filter, which is applied to
+	// the subtree selected by `userBase`.
+	UserSearchMatching *string `json:"userSearchMatching,omitempty"`
+	// the search depth for user entries, relative to
+	// the node specified by `userBase`.
+	UserSearchSubtree *bool `json:"userSearchSubtree,omitempty"`
+	// the name of the multi-valued attribute of the user
+	// entry that contains a list of role names for the user
+	UserRoleName *string `json:"userRoleName,omitempty"`
+	// This option selects a particular subtree
+	// of the DIT to search for role/group entries.
+	RoleBase *string `json:"roleBase,omitempty"`
+	// the attribute type of the role entry that contains the
+	// name of the role/group (e.g. C, O, OU, etc.).
+	RoleName *string `json:"roleName,omitempty"`
+	// LDAP search filter, which is applied to
+	// the subtree selected by `roleBase`.
+	RoleSearchMatching *string `json:"roleSearchMatching,omitempty"`
+	// the search depth for role entries, relative to
+	// the node specified by `roleBase`.
+	RoleSearchSubtree *bool `json:"roleSearchSubtree,omitempty"`
+	// boolean flag to disable authentication
+	AuthenticateUser *bool `json:"authenticateUser,omitempty"`
+	// how to handle referrals; valid values: `ignore`,
+	// `follow`, `throw`; default is `ignore`.
+	Referral *string `json:"referral,omitempty"`
+	// boolean flag for use when searching Active
+	// Directory (AD).
+	IgnorePartialResultException *bool `json:"ignorePartialResultException,omitempty"`
+	// boolean indicating whether to enable the role expansion
+	// functionality or not
+	ExpandRoles *bool `json:"expandRoles,omitempty"`
+	// specifies an LDAP search filter which is applied to
+	// the subtree selected by `roleBase`.
+	ExpandRolesMatching *string `json:"expandRolesMatching,omitempty"`
+	// whether to enable debug logging
+	Debug *bool `json:"debug,omitempty"`
+	// password codec used to mask password
+	PasswordCodec *string `json:"passwordCodec,omitempty"`
+	// additional options
+	AdditionalOptions []KeyValueType `json:"additionalOptions,omitempty"`
 }
 
 type KeycloakModuleConfigurationType struct {

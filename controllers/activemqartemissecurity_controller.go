@@ -202,6 +202,13 @@ func (r *ActiveMQArtemisSecurityConfigHandler) processCrPasswords() *brokerv1bet
 			}
 		}
 	}
+	if len(result.Spec.LoginModules.LdapLoginModules) > 0 {
+		for _, pm := range result.Spec.LoginModules.LdapLoginModules {
+			if pm.Options.ConnectionPassword == nil && pm.Options.ConnectionUsername != nil {
+				pm.Options.ConnectionPassword = r.getPassword("security-ldap-"+pm.Name, *pm.Options.ConnectionUsername)
+			}
+		}
+	}
 	return result
 }
 

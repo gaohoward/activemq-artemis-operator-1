@@ -564,6 +564,128 @@ spec:
                           type: string
                       type: object
                     type: array
+                  ldapLoginModules:
+                    items:
+                      properties:
+                        name:
+                          description: Name for LdapLoginModuleType
+                          type: string
+                        options:
+                          properties:
+                            additionalOptions:
+                              description: additional options
+                              items:
+                                properties:
+                                  key:
+                                    description: The credentials key
+                                    type: string
+                                  value:
+                                    description: The credentials value
+                                    type: string
+                                type: object
+                              type: array
+                            authenticateUser:
+                              description: boolean flag to disable authentication
+                              type: boolean
+                            authentication:
+                              description: 'authentication method used when binding
+                                to the LDAP server. Available values are: `simple`
+                                (username and password, default), `GSSAPI` (Kerberos
+                                SASL) or `none` (anonymous).'
+                              type: string
+                            connectionPassword:
+                              description: the password that matches the DN from `connectionUsername`
+                              type: string
+                            connectionPool:
+                              description: enable the LDAP connection pool property
+                                'com.sun.jndi.ldap.connect.pool'
+                              type: string
+                            connectionProtocol:
+                              description: currently must be empty string
+                              type: string
+                            connectionTimeout:
+                              description: the string representation of an integer
+                                representing the connection timeout in milliseconds
+                              type: string
+                            connectionURL:
+                              description: url to be used to connect to ldap server
+                              type: string
+                            connectionUsername:
+                              description: the DN of the user that opens the connection
+                                to the directory server
+                              type: string
+                            debug:
+                              description: whether to enable debug logging
+                              type: boolean
+                            expandRoles:
+                              description: boolean indicating whether to enable the
+                                role expansion functionality or not
+                              type: boolean
+                            expandRolesMatching:
+                              description: specifies an LDAP search filter which is
+                                applied to the subtree selected by `roleBase`.
+                              type: string
+                            ignorePartialResultException:
+                              description: boolean flag for use when searching Active
+                                Directory (AD).
+                              type: boolean
+                            passwordCodec:
+                              description: password codec used to mask password
+                              type: string
+                            readTimeout:
+                              description: the string representation of an integer
+                                representing the read timeout in milliseconds for
+                                LDAP operations
+                              type: string
+                            referral:
+                              description: 'how to handle referrals; valid values:
+                                `ignore`, `follow`, `throw`; default is `ignore`.'
+                              type: string
+                            roleBase:
+                              description: This option selects a particular subtree
+                                of the DIT to search for role/group entries.
+                              type: string
+                            roleName:
+                              description: the attribute type of the role entry that
+                                contains the name of the role/group (e.g. C, O, OU,
+                                etc.).
+                              type: string
+                            roleSearchMatching:
+                              description: LDAP search filter, which is applied to
+                                the subtree selected by `roleBase`.
+                              type: string
+                            roleSearchSubtree:
+                              description: the search depth for role entries, relative
+                                to the node specified by `roleBase`.
+                              type: boolean
+                            saslLoginConfigScope:
+                              description: the scope in JAAS configuration (login.config)
+                                to use to obtain Kerberos initiator credentials when
+                                the `authentication` method is SASL `GSSAPI`. The
+                                default value is `broker-sasl-gssapi`
+                              type: string
+                            userBase:
+                              description: selects a particular subtree of the DIT
+                                to search for user entries.
+                              type: string
+                            userRoleName:
+                              description: the name of the multi-valued attribute
+                                of the user entry that contains a list of role names
+                                for the user
+                              type: string
+                            userSearchMatching:
+                              description: specifies an LDAP search filter, which
+                                is applied to the subtree selected by `userBase`.
+                              type: string
+                            userSearchSubtree:
+                              description: the search depth for user entries, relative
+                                to the node specified by `userBase`.
+                              type: boolean
+                          required:
+                          - connectionURL
+                          type: object
+                      type: object
+                    type: array
                   propertiesLoginModules:
                     items:
                       properties:

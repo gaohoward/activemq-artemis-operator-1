@@ -97,9 +97,8 @@ type LdapLoginModuleType struct {
 }
 
 type LdapLoginModuleOptionsType struct {
-
 	// url to be used to connect to ldap server
-	ConnectionUrl string `json:"connectionURL"`
+	ConnectionUrl string `json:"connectionUrl"`
 	// authentication method used when binding to
 	// the LDAP server. Available values are:
 	// `simple` (username and password, default),
@@ -162,8 +161,6 @@ type LdapLoginModuleOptionsType struct {
 	// specifies an LDAP search filter which is applied to
 	// the subtree selected by `roleBase`.
 	ExpandRolesMatching *string `json:"expandRolesMatching,omitempty"`
-	// whether to enable debug logging
-	Debug *bool `json:"debug,omitempty"`
 	// password codec used to mask password
 	PasswordCodec *string `json:"passwordCodec,omitempty"`
 	// additional options

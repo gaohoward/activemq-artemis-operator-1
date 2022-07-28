@@ -575,15 +575,12 @@ spec:
                             connectionTimeout:
                               description: the string representation of an integer representing the connection timeout in milliseconds
                               type: string
-                            connectionURL:
+                            connectionUrl:
                               description: url to be used to connect to ldap server
                               type: string
                             connectionUsername:
                               description: the DN of the user that opens the connection to the directory server
                               type: string
-                            debug:
-                              description: whether to enable debug logging
-                              type: boolean
                             expandRoles:
                               description: boolean indicating whether to enable the role expansion functionality or not
                               type: boolean
@@ -630,7 +627,7 @@ spec:
                               description: the search depth for user entries, relative to the node specified by `userBase`.
                               type: boolean
                           required:
-                          - connectionURL
+                          - connectionUrl
                           type: object
                       type: object
                     type: array

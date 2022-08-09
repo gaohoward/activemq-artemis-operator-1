@@ -2291,7 +2291,7 @@ var _ = Describe("artemis controller", func() {
 					}
 				}
 				return ret
-			}, timeout, interval).Should(BeEquivalentTo(2))
+			}, timeout, interval).Should(BeEquivalentTo(4))
 
 			// cleanup
 			Expect(k8sClient.Delete(ctx, &crd1)).Should(Succeed())
@@ -2325,7 +2325,255 @@ var _ = Describe("artemis controller", func() {
 					}
 				}
 				return ret
-			}, timeout, interval).Should(BeEquivalentTo(2))
+			}, timeout, interval).Should(BeEquivalentTo(4))
+
+			// cleanup
+			Expect(k8sClient.Delete(ctx, &crd1)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, &crd2)).Should(Succeed())
+		})
+
+	})
+
+	Context("LoggerProperties", Label("LoggerProperties test"), func() {
+		It("Expect vol mount via config map", func() {
+			By("By creating a new crd with LoggerProperties in the spec")
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+
+			crd.Spec.LoggerProperties = []string{"logger.handlers=CONSOLE"}
+
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+			Eventually(func() bool { return getPersistedVersionedCrd(crd.ObjectMeta.Name, defaultNamespace, createdCrd) }, timeout, interval).Should(BeTrue())
+			Expect(createdCrd.Name).Should(Equal(crd.ObjectMeta.Name))
+
+			hexShaOriginal := HexShaHashOfMap(crd.Spec.LoggerProperties)
+
+			By("By finding a new config map with logger props")
+			configMap := &corev1.ConfigMap{}
+			key := types.NamespacedName{Name: crd.ObjectMeta.Name + "-logger-" + hexShaOriginal, Namespace: crd.ObjectMeta.Namespace}
+			fmt.Println("==============finding key ", key)
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, key, configMap)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("By checking the container stateful set for java opts")
+			Eventually(func() (bool, error) {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+				createdSs := &appsv1.StatefulSet{}
+
+				err := k8sClient.Get(ctx, key, createdSs)
+				if err != nil {
+					return false, err
+				}
+
+				found := false
+				for _, container := range createdSs.Spec.Template.Spec.InitContainers {
+					for _, env := range container.Env {
+						if env.Name == "LOGGER_PROPERTIES" {
+							if strings.Contains(env.Value, "logger.properties") {
+								found = true
+							}
+						}
+					}
+				}
+
+				return found, err
+			}, duration, interval).Should(Equal(true))
+
+			By("By checking the stateful set for volume mount path")
+			Eventually(func() (bool, error) {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+				createdSs := &appsv1.StatefulSet{}
+
+				err := k8sClient.Get(ctx, key, createdSs)
+				if err != nil {
+					return false, err
+				}
+
+				found := false
+				for _, container := range createdSs.Spec.Template.Spec.Containers {
+					for _, vm := range container.VolumeMounts {
+						// mount path can't have a .
+						if strings.Contains(vm.MountPath, "-props-") {
+							found = true
+						}
+					}
+				}
+
+				return found, err
+			}, duration, interval).Should(Equal(true))
+
+			By("By checking the container stateful launch set for STATEFUL_SET_ORDINAL")
+			Eventually(func() (bool, error) {
+				key := types.NamespacedName{Name: namer.CrToSS(createdCrd.Name), Namespace: defaultNamespace}
+				createdSs := &appsv1.StatefulSet{}
+
+				err := k8sClient.Get(ctx, key, createdSs)
+				if err != nil {
+					return false, err
+				}
+
+				found := false
+				for _, container := range createdSs.Spec.Template.Spec.Containers {
+					for _, command := range container.Command {
+						if strings.Contains(command, "STATEFUL_SET_ORDINAL") {
+							found = true
+						}
+					}
+				}
+
+				return found, err
+			}, duration, interval).Should(Equal(true))
+
+			Expect(k8sClient.Delete(ctx, createdCrd)).Should(Succeed())
+
+			By("check it has gone")
+			Eventually(func() bool {
+				return checkCrdDeleted(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+			}, timeout, interval).Should(BeTrue())
+
+		})
+
+		It("Expect new config map on update to LoggerProperties", func() {
+			By("By creating a crd with LoggerProperties in the spec")
+			ctx := context.Background()
+			crd := generateArtemisSpec(defaultNamespace)
+
+			crd.Spec.LoggerProperties = []string{"logger.handlers=CONSOLE"}
+			hexShaOriginal := HexShaHashOfMap(crd.Spec.LoggerProperties)
+			Expect(k8sClient.Create(ctx, &crd)).Should(Succeed())
+
+			By("By eventualy finding a matching config map with broker props")
+			configMapList := &corev1.ConfigMapList{}
+			opts := &client.ListOptions{
+				Namespace: defaultNamespace,
+			}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, configMapList, opts)
+				if err != nil {
+					fmt.Printf("error getting list of configopts map! %v", err)
+				}
+				for _, cm := range configMapList.Items {
+					if strings.Contains(cm.ObjectMeta.Name, hexShaOriginal) {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			By("updating the crd, expect new ConfigMap name")
+			createdCrd := &brokerv1beta1.ActiveMQArtemis{}
+
+			By("pushing the update on the current version...")
+			Eventually(func() bool {
+
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: crd.ObjectMeta.Name, Namespace: crd.ObjectMeta.Namespace}, createdCrd)
+				if err == nil {
+
+					// add a new property
+					createdCrd.Spec.LoggerProperties = append(createdCrd.Spec.LoggerProperties, "gen="+strconv.FormatInt(createdCrd.ObjectMeta.Generation, 10))
+
+					err = k8sClient.Update(ctx, createdCrd)
+					if err != nil {
+						fmt.Printf("error on update! %v\n", err)
+					}
+				}
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			hexShaModified := HexShaHashOfMap(createdCrd.Spec.LoggerProperties)
+
+			By("finding the updated config map using the sha")
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, configMapList, opts)
+
+				if err == nil && len(configMapList.Items) > 0 {
+
+					for _, cm := range configMapList.Items {
+						if strings.Contains(cm.ObjectMeta.Name, hexShaModified) {
+							return true
+						}
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			// cleanup
+			Expect(k8sClient.Delete(ctx, createdCrd)).Should(Succeed())
+			By("check it has gone")
+			Eventually(func() bool {
+				return checkCrdDeleted(crd.ObjectMeta.Name, defaultNamespace, createdCrd)
+			}, timeout, interval).Should(BeTrue())
+
+			// cannot verify no leaks b/c gc is not enabled on envTest
+			// and on delete we don't have any state to determine the owner reference
+		})
+
+		It("Expect two crs to coexist", func() {
+			By("By creating two crds with LoggerProperties in the spec")
+			ctx := context.Background()
+			crd1 := generateArtemisSpec(defaultNamespace)
+			crd2 := generateArtemisSpec(defaultNamespace)
+
+			Expect(k8sClient.Create(ctx, &crd1)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, &crd2)).Should(Succeed())
+
+			By("By eventualy finding two config maps with logger props")
+			configMapList := &corev1.ConfigMapList{}
+			opts := &client.ListOptions{
+				Namespace: defaultNamespace,
+			}
+			Eventually(func() int {
+				err := k8sClient.List(ctx, configMapList, opts)
+				if err != nil {
+					fmt.Printf("error getting list of config opts map! %v", err)
+				}
+
+				ret := 0
+				for _, cm := range configMapList.Items {
+					if strings.Contains(cm.ObjectMeta.Name, crd1.Name) || strings.Contains(cm.ObjectMeta.Name, crd2.Name) {
+						ret++
+					}
+				}
+				return ret
+			}, timeout, interval).Should(BeEquivalentTo(4))
+
+			// cleanup
+			Expect(k8sClient.Delete(ctx, &crd1)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, &crd2)).Should(Succeed())
+		})
+
+		It("Expect two crs to coexist", func() {
+			By("By creating two crds with LoggerProperties in the spec")
+			ctx := context.Background()
+			crd1 := generateArtemisSpec(defaultNamespace)
+			crd2 := generateArtemisSpec(defaultNamespace)
+
+			Expect(k8sClient.Create(ctx, &crd1)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, &crd2)).Should(Succeed())
+
+			By("By eventualy finding two config maps with broker props")
+			configMapList := &corev1.ConfigMapList{}
+			opts := &client.ListOptions{
+				Namespace: defaultNamespace,
+			}
+			Eventually(func() int {
+				err := k8sClient.List(ctx, configMapList, opts)
+				if err != nil {
+					fmt.Printf("error getting list of configopts map! %v", err)
+				}
+
+				ret := 0
+				for _, cm := range configMapList.Items {
+					if strings.Contains(cm.ObjectMeta.Name, crd1.Name) || strings.Contains(cm.ObjectMeta.Name, crd2.Name) {
+						ret++
+					}
+				}
+				return ret
+			}, timeout, interval).Should(BeEquivalentTo(4))
 
 			// cleanup
 			Expect(k8sClient.Delete(ctx, &crd1)).Should(Succeed())

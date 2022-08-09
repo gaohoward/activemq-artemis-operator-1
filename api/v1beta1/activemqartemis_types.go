@@ -47,6 +47,8 @@ type ActiveMQArtemisSpec struct {
 
 	// Optional list of key=value properties that are applied to the broker configuration bean.
 	BrokerProperties []string `json:"brokerProperties,omitempty"`
+	// Properties used to configure broker's jboss logging (logging.properties file)
+	LoggerProperties []string `json:"loggerProperties,omitempty"`
 }
 
 type AddressSettingsType struct {

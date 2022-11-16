@@ -345,7 +345,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(c
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) {
 
-	reconciler.configureConsoleExposure(customResource, namer, client, scheme)
+	reconciler.configureConsoleExposure(customResource, namer, client, scheme, currentStatefulSet)
 	if !customResource.Spec.Console.SSLEnabled {
 		return
 	}
@@ -776,7 +776,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConnectorsExposure(cus
 	return causedUpdate, err
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) (bool, error) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) (bool, error) {
 
 	var i int32 = 0
 	var err error = nil
@@ -789,6 +789,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(custom
 		Name:      customResource.Name,
 		Namespace: customResource.Namespace,
 	}
+	currentStatefulSet.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{}
 	for ; i < customResource.Spec.DeploymentPlan.Size; i++ {
 		ordinalString = strconv.Itoa(int(i))
 		var serviceRoutelabels = make(map[string]string)
@@ -806,6 +807,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(custom
 		if console.Expose {
 			reconciler.checkExistingService(customResource, serviceDefinition, client)
 			reconciler.trackDesired(serviceDefinition)
+			currentStatefulSet.Spec.Template.Spec.Containers[0].Ports = append(currentStatefulSet.Spec.Template.Spec.Containers[0].Ports, corev1.ContainerPort{Name: targetPortName, ContainerPort: 8161, Protocol: corev1.ProtocolTCP})
 		}
 		var err error = nil
 		isOpenshift := false

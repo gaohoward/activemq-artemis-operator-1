@@ -805,6 +805,37 @@ var _ = Describe("artemis controller", func() {
 	})
 
 	Context("Console config test", func() {
+		It("checking console target service port name for metrics", Label("console-expose-metrics"), func() {
+			By("Deploying a broker with console exposed")
+			brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+				candidate.Spec.DeploymentPlan.Size = 2
+				candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+					InitialDelaySeconds: 1,
+					PeriodSeconds:       1,
+					TimeoutSeconds:      5,
+				}
+				candidate.Spec.Console.Expose = true
+			})
+
+			ssKey := types.NamespacedName{
+				Name:      namer.CrToSS(brokerCr.Name),
+				Namespace: defaultNamespace,
+			}
+			currentSS := &appsv1.StatefulSet{}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, ssKey, currentSS)).Should(Succeed())
+				g.Expect(len(currentSS.Spec.Template.Spec.Containers[0].Ports)).To(Equal(2))
+				g.Expect(currentSS.Spec.Template.Spec.Containers[0].Ports[0].Name).To(Equal("wconsj-0"))
+				g.Expect(currentSS.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(8161)))
+				g.Expect(currentSS.Spec.Template.Spec.Containers[0].Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+				g.Expect(currentSS.Spec.Template.Spec.Containers[0].Ports[1].Name).To(Equal("wconsj-1"))
+				g.Expect(currentSS.Spec.Template.Spec.Containers[0].Ports[1].ContainerPort).To(Equal(int32(8161)))
+				g.Expect(currentSS.Spec.Template.Spec.Containers[0].Ports[1].Protocol).To(Equal(corev1.ProtocolTCP))
+			}, timeout, interval).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, createdBrokerCr)).Should(Succeed())
+		})
+
 		It("Exposing secured console", Label("console-expose-ssl"), func() {
 			//we need to use existing cluster to differentiate testing
 			//between openshift and k8s, also need it to check pod status

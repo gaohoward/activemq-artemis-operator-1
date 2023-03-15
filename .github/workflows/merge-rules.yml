@@ -1,0 +1,29 @@
+name: 'Pull Request Check'
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+  push:
+    branches:
+      - main
+
+jobs:
+  check-commit-message:
+    name: Check Commit Message
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Commit Header
+        uses: gsactions/commit-message-checker@v2
+        with:
+          pattern: '^\[#([0-9])+\] .+$|^(\[NO-JIRA\] ).+$'
+          flags: 'gm'
+          error: 'The commit line should begin with [#<issue>] where issue should be an issue number like [#234] or [NO-JIRA] for small changes.'

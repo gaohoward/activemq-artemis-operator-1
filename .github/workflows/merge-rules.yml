@@ -19,12 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v3
-        with:
+        uses: actions/checkout@v2
+        # with:
           # fetch-depth: 0
           # ref: ${{github.event.after}}
           # this only get last: MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
-          ref: ${{github.event.pull_request.commits}}
+          # ref: ${{github.event.pull_request.commits}}
       - name: Get Commit Message
         run: >
           echo "checking message: ${{github.event.pull_request.commits}}"
+          echo "what is github.event.after: ${{github.event.after}}"
+#          MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&

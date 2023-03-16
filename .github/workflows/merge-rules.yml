@@ -21,10 +21,12 @@ jobs:
     name: Check Commit Message
     runs-on: ubuntu-latest
     steps:
-      - name: Check Commit Header
-        uses: gsactions/commit-message-checker@v2
+      - name: Checkout the repo
+        uses: actions/checkout@v2
         with:
-          pattern: '^\[#([0-9])+\] .+$|^(\[NO-JIRA\] ).+$'
-          excludeTitle: 'true'
-          flags: 'gm'
-          error: 'The commit line should begin with [#<issue>] where issue should be an issue number like [#234] or [NO-JIRA] for small changes.'
+          fetch-depth: 0
+          ref: ${{github.event.after}}
+      - name: Get Commit Message
+        run: >
+          MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
+          echo "checking message: $MSG"

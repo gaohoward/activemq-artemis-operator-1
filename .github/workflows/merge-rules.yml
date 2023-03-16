@@ -23,11 +23,11 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
-        with:
+        # with:
           # fetch-depth: 0
           # ref: ${{github.event.after}}
           # this only get last: MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
-          ref: ${{github.event.pull_request.commits}}
+          # ref: ${{github.event.pull_request.commits}}
       - name: Get Commit Message
         run: >
           echo "checking message: ${{github.event.pull_request.commits}}"

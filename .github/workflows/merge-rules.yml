@@ -26,7 +26,13 @@ jobs:
           # this only get last: MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
           # ref: ${{github.event.pull_request.commits}}
       - name: Get Commit Message
-        run: >
+        run: |
           echo "checking message: ${{github.event.pull_request.commits}}"
           echo "what is github.event.after: ${{github.event.after}}"
-#          MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
+          CMTN=${{github.event.pull_request.commits}}
+          for (( N=1; N<=$CMTN; N++ ))
+          do
+            MSG=$(git log --format=%B -n $N ${{github.event.after}}) &&
+            echo "$N - hey $MSG"
+          done
+

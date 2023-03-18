@@ -20,8 +20,8 @@ jobs:
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
-        # with:
-          # fetch-depth: 0
+        with:
+          fetch-depth: 0
           # ref: ${{github.event.after}}
           # this only get last: MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
           # ref: ${{github.event.pull_request.commits}}
@@ -33,7 +33,7 @@ jobs:
           for (( N=1; N<=$CMTN; N++ ))
           do
             echo "doing $N"
-            MSG=$(git log --format=%B -n 1 ${{github.event.after}})
+            MSG=$(git log --format=%B -n $N ${{github.event.after}})
             echo "$N - hey $MSG"
           done
 

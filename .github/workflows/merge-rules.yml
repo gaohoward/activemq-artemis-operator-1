@@ -32,8 +32,8 @@ jobs:
           CMTN=${{github.event.pull_request.commits}}
           for (( N=1; N<=$CMTN; N++ ))
           do
-            echo "doing $N and ${{N}}"
-            MSG=$(git log --format=%B -n ${{N}} ${{github.event.after}})
+            echo "doing $N"
+            MSG=$(git log --format=%B -n ${N} ${{github.event.after}})
             echo "$N - hey $MSG"
           done
 

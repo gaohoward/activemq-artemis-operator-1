@@ -27,9 +27,8 @@ jobs:
           # ref: ${{github.event.pull_request.commits}}
       - name: Get Commit Message
         run: |
-          CMTN=${{github.event.pull_request.commits}}
           nlines=-1
-          for (( N=1; N<=$CMTN; N++ ))
+          for (( N=1; N<=${{github.event.pull_request.commits}}; N++ ))
           do
             prev_lines=$(($nlines+1))
             nlines=0

@@ -28,7 +28,7 @@ jobs:
               nlines=$((nlines+1))
               if (( $nlines == $prev_lines+1 )); then
                 if ! [[ "$line" =~ ^\[#([0-9])+\]\ .+$|^(\[NO-JIRA\]\ ).+$ ]]; then
-                  echo "Commit message should begin with [#nnn] or [NO-JIRA], followed by a space."
+                  echo "[ commit $N ]: Commit message should begin with [#nnn] or [NO-JIRA], followed by a space."
                   echo "but it is: $line"
                   exit 1
                 fi

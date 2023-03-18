@@ -42,7 +42,7 @@ jobs:
                   exit 1
                 fi
               fi
-            done <<< $(git log --format=%B -n $N ${{github.event.after}})
+            done <<< $(git log --format=%B -n $N ${{github.event.pull_request.head.sha}})
           done
       - name: Show github context
         env:

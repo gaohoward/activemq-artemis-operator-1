@@ -27,20 +27,21 @@ jobs:
           # ref: ${{github.event.pull_request.commits}}
       - name: Get Commit Message
         run: |
-          echo "checking message: ${{github.event.pull_request.commits}}"
-          echo "what is github.event.after: ${{github.event.after}}"
           CMTN=${{github.event.pull_request.commits}}
           nlines=-1
           for (( N=1; N<=$CMTN; N++ ))
           do
-            echo "doing commit $N"
             prev_lines=$(($nlines+1))
             nlines=0
             while IFS= read -r line
             do
               nlines=$((nlines+1))
               if (( $nlines == $prev_lines+1 )); then
-                echo "checking ===$line"
+                if ! [[ "$line" =~ ^\[#([0-9])+\]\ .+$|^(\[NO-JIRA\]\ ).+$ ]]; then
+                  echo "Commit message should begin with [#nnn] or [NO-JIRA]"
+                  echo "but it is: $line"
+                  exit 1
+                fi
               fi
             done <<< $(git log --format=%B -n $N ${{github.event.after}})
           done

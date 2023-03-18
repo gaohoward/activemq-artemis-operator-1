@@ -6,12 +6,6 @@ on:
       - edited
       - reopened
       - synchronize
-  pull_request_target:
-    types:
-      - opened
-      - edited
-      - reopened
-      - synchronize
 
 jobs:
   check-commit-message:
@@ -22,9 +16,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          # ref: ${{github.event.after}}
-          # this only get last: MSG=$(git log --format=%B -n 1 ${{github.event.after}}) &&
-          # ref: ${{github.event.pull_request.commits}}
       - name: Get Commit Message
         run: |
           nlines=-1
@@ -44,7 +35,3 @@ jobs:
               fi
             done <<< $(git log --format=%B -n $N ${{github.event.pull_request.head.sha}})
           done
-      - name: Show github context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"

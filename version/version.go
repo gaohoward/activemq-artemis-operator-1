@@ -51,7 +51,7 @@ var FullVersionFromCompactVersion map[string]string = map[string]string{
 	"7103": "7.10.3",
 }
 
-//The yacfg profile to use for a given full version of broker
+// The yacfg profile to use for a given full version of broker
 var YacfgProfileVersionFromFullVersion map[string]string = map[string]string{
 	"7.7.0":  "7.7.0",
 	"7.8.0":  "7.8.0",

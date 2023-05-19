@@ -6,8 +6,40 @@ metadata:
     capabilities: Seamless Upgrades
     categories: Streaming & Messaging
     certified: "false"
-    description: AMQ Broker Operator for RHEL 8 (Multiarch) provides the ability to
-      deploy and manage stateful AMQ Broker clusters
+    description:
+    **Red Hat AMQ Broker** is a pure-Java multiprotocol message broker. It’s built on an efficient, asynchronous core with a fast journal for message persistence.
+
+    You can provision multiple instances and update the broker configuration on the fly using the associated Custom Resource Definitions.
+    In addition, you can use the following CRDs to configure your broker environment:
+    Address CRD: define addresses and queues for the brokers in your deployment
+    Security CRD:
+      define the security configuration for the brokers in your deployment, including:
+        - users and roles
+        - role based access control
+        - console access control
+
+    ## Selecting a channel
+    You can specify the channel used to track and receive updates for the Operator by selecting either to track the minor or patch level versions.
+
+    ## Supported Features
+    - **Console** - Allows you view the broker topology, clients and messages. Red Hat Fuse users can integrate the broker console into the Fuse console for OpenShift.
+    - **Persistence** - ephemeral and stateful deployments.
+    - **Advanced queueing** - Last value queues, message groups, topic hierarchies, and large message support.
+    - **Multiprotocol** - AMQP 1.0, MQTT, STOMP, OpenWire, and HornetQ Core.
+    - **Address Management** - Creates and manages addresses and queues.
+    - **User Management** - Creates and manages broker users.
+    - **Monitoring** - Support for monitoring using Prometheus and provided Grafana dashboards.
+    - **Scaledown** - Ensure consistency of messages using message migration.
+
+    ## Storage
+    An efficient data storage infrastructure is essential to the optimal performance of AMQ Broker.  AMQ Broker supports:
+      - **Ephemeral** (Recommended for development only!)
+      - **Persistent**
+        - For example, block or NFS storage.
+    Note: Your cloud provider might provide options that are not suitable for AMQ Broker, for example Amazon Elastic File System.  If in doubt, contact Red Hat Support
+
+    ## Documentation
+    Documentation for the current release is available from the [Red Hat Customer Portal](https://access.redhat.com/documentation/en-us/red_hat_amq/2021.q4/#category-amq-broker).
     operators.openshift.io/valid-subscription: '["Red Hat Runtimes", "Red Hat Integration",
       "Red Hat Process Automation", "Red Hat AMQ"]'
     repository: https://github.com/rh-messaging/activemq-artemis-operator

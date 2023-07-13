@@ -1068,7 +1068,9 @@ spec:
   deploymentPlan:
     size: 1
 ```
-And you use init container to configure security to have a username **alice** with password **password1** for jolikia access. To enable operator to use client to have access jolokia, create a secret named **amq-jolokia-secret** in the same namespace, like this:
+
+And you use init container to configure security to have a username **alice** with password **password1** for jolokia access. To enable operator to use client to have access jolokia, create a secret named **amq-jolokia-secret** in the same namespace, like this:
+
 ```yaml
 apiVersion: v1
 metadata:
@@ -1079,4 +1081,169 @@ type: Opaque
 stringData:
   jolokiaUser: alice
   jolokiaPassword: password1
+```
+
+## Using Cert-Manager certificates to configure brokers
+
+Note: this feature currently is experimental. Feed back is welcomed.
+
+* Certificate should be local to broker
+* TrustManager should have its trust namespace configured to be broker's namespace.
+
+[cert-manager](https://cert-manager.io/) adds certificates and certificate issuers as resource types in Kubernetes clusters, and simplifies the process of obtaining, renewing and using those certificates.
+
+The operator provides options in the custom resource that utilizes cert-manager x509 certificates to configure SSL/TLS transports for brokers.
+
+For a certificate to be used by broker, it has to have the keystore configured with either `pkcs12` or `jks`. For example:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: server-cert-pkcs12
+  namespace: my-cert
+spec:
+  commonName: "artemiscloud.io"
+  dnsNames:
+    - "artemis-broker-ss-0"
+  secretName: server-cert-pkcs12-secret
+  subject:
+    organizations:
+    - "www.artemiscloud.io"
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: keystore-password-secret
+        key: pkcs12-password
+  issuerRef:
+    name: test-selfsign-cluster-issuer
+    kind: ClusterIssuer
+```
+The above yaml represents a certificate named `server-cert-pkcs12` in namespace `my-cert`. The pkcs12 keystore is configured and its password is stored in a secret named `keystore-password-secret` and the key is `pkcs12-password`. This secret must exists in order for the certificate to be successfully created, and password secret should be in the same namespace as the certificate's.
+
+### Configuring SSL/TLS for management console
+
+Once you have the certificate ready you can configure the management console of the broker to used it:
+
+```yaml
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+  namespace: my-cert
+spec:
+  console:
+    expose: true
+    sslEnabled: true
+    brokerCert: server-cert-pkcs12
+  deploymentPlan:
+    size: 1
+```
+
+The above broker cr configures a broker that has a SSL/TLS secured management console whose keystore and truststore are generated from certificate `server-cert-pkcs12` in namespace `my-cert`.
+
+If you don't specify the namespace, it assumes the certificate is in the same namespace as that of the broker CR.
+
+### Configuring SSL/TLS for acceptors and connectors
+
+With the certificate ready you can configure an acceptor and/or connector of the broker to used it:
+
+```yaml
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+  namespace: my-cert
+spec:
+  acceptors:
+  - name: new-acceptor
+    port: 62666
+    protocols: all
+    sslSecret: acceptor-ssl-secret
+    expose: true
+    sslEnabled: true
+    brokerCert: server-cert-pkcs12
+  deploymentPlan:
+    size: 1
+```
+
+The above broker cr configures a broker that has a SSL/TLS secured acceptor called `new-acceptor` whose keystore and truststore are generated from certificate `server-cert-pkcs12` in namespace `my-cert`.
+
+You can configure a connector with ssl parameters from a certificate in like manner, for example the following yaml configures a connector called `new-connector` with the certificated above mentioned:
+
+```yaml
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+spec:
+  connectors:
+  - name: new-connector
+    host: artemis-broker-ss-0
+    port: 62666
+    enabledProtocols: all
+    sslSecret: connector-ssl-secret
+    expose: true
+    sslEnabled: true
+    brokerCert: server-cert-pkcs12
+  deploymentPlan:
+    size: 1
+```
+
+For details on how to use cert-manager to manage your certificates please refer to its [documentation](https://cert-manager.io/docs/).
+
+### Using trust-manager to distribute trust store for brokers
+
+With cert-manager certificate the SSL truststore is configured to use the CA certs from the certificate's secret. To configure a different truststore, user can optionally install the [trust-manager](https://cert-manager.io/docs/trust/trust-manager/) and configure the broker CR to use its bundle resources.
+
+First create a bundle resource like this:
+
+```yaml
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: ca-bundle
+spec:
+  sources:
+  - useDefaultCAs: false
+  - secret:
+      name: "my-root-ca"
+      key: "tls.crt"
+  target:
+    secret:
+      key: "trust-bundle.pem"
+    additionalFormats:
+      jks:
+        key: "truststore.jks"
+```
+
+Note: `spec.target.additionalFormats` is required.
+
+Then you can populate a broker's truststore with the `trustBundle` option in CR.
+
+For example:
+
+```yaml
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+spec:
+  console:
+    expose: true
+    sslEnabled: true
+    brokerCert: server-cert-pkcs12
+    trustBundle: ca-bundle # name of the bundle
+  acceptors:
+    - name: new-acceptor
+      protocols: all
+      port: 62666
+      sslEnabled: true
+      expose: true
+      brokerCert: server-cert-pkcs12
+      trustBundle: ca-bundle # name of the bundle
+  deploymentPlan:
+    requireLogin: false
+    size: 1
 ```

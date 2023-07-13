@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/certutil"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/namer"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -157,7 +158,10 @@ func (r *ActiveMQArtemisReconciler) Reconcile(ctx context.Context, request ctrl.
 		return result, err
 	}
 
-	namer := MakeNamers(customResource)
+	namer, err := MakeNamers(customResource)
+	if err != nil {
+		return result, err
+	}
 	reconciler := NewActiveMQArtemisReconcilerImpl(customResource, r.log, r.Scheme)
 
 	var requeueRequest bool = false
@@ -301,6 +305,9 @@ func validateSSLEnabledSecrets(customResource *brokerv1beta1.ActiveMQArtemis, cl
 	if customResource.Spec.Console.SSLEnabled {
 
 		secretName := namer.SecretsConsoleNameBuilder.Name()
+		if customResource.Spec.Console.SSLSecret != "" {
+			secretName = customResource.Spec.Console.SSLSecret
+		}
 
 		secret := corev1.Secret{}
 		found := retrieveResource(secretName, customResource.Namespace, &secret, client, scheme)
@@ -479,6 +486,9 @@ func AssertConfigMapContainsKey(configMap corev1.ConfigMap, key string, contextM
 }
 
 func AssertSecretContainsKey(secret corev1.Secret, key string, contextMessage string) *metav1.Condition {
+	if certutil.IsSecretFromCert(&secret) {
+		return nil
+	}
 	if _, present := secret.Data[key]; !present {
 		return &metav1.Condition{
 			Type:    brokerv1beta1.ValidConditionType,
@@ -491,6 +501,9 @@ func AssertSecretContainsKey(secret corev1.Secret, key string, contextMessage st
 }
 
 func AssertSecretContainsOneOf(secret corev1.Secret, keys []string, contextMessage string) *metav1.Condition {
+	if certutil.IsSecretFromCert(&secret) {
+		return nil
+	}
 	for _, key := range keys {
 		_, present := secret.Data[key]
 		if present {
@@ -520,7 +533,7 @@ func hasExtraMounts(cr *brokerv1beta1.ActiveMQArtemis) bool {
 	return len(cr.Spec.DeploymentPlan.ExtraMounts.Secrets) > 0
 }
 
-func MakeNamers(customResource *brokerv1beta1.ActiveMQArtemis) *common.Namers {
+func MakeNamers(customResource *brokerv1beta1.ActiveMQArtemis) (*common.Namers, error) {
 	newNamers := common.Namers{
 		SsGlobalName:                  "",
 		SsNameBuilder:                 namer.NamerData{},
@@ -545,9 +558,10 @@ func MakeNamers(customResource *brokerv1beta1.ActiveMQArtemis) *common.Namers {
 		newNamers.SecretsConsoleNameBuilder.Prefix(customResource.Name).Base("console").Suffix("secret").Generate()
 	}
 	newNamers.SecretsNettyNameBuilder.Prefix(customResource.Name).Base("netty").Suffix("secret").Generate()
+
 	newNamers.LabelBuilder.Base(customResource.Name).Suffix("app").Generate()
 
-	return &newNamers
+	return &newNamers, nil
 }
 
 func GetDefaultLabels(cr *brokerv1beta1.ActiveMQArtemis) map[string]string {

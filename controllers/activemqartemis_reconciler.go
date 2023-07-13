@@ -22,6 +22,7 @@ import (
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/secrets"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/serviceports"
 	ss "github.com/artemiscloud/activemq-artemis-operator/pkg/resources/statefulsets"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/certutil"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/cr2jinja2"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/jolokia_client"
@@ -104,6 +105,7 @@ type ActiveMQArtemisReconcilerImpl struct {
 	log                logr.Logger
 	customResource     *brokerv1beta1.ActiveMQArtemis
 	scheme             *runtime.Scheme
+	PemCfgMap          map[string]bool
 }
 
 func NewActiveMQArtemisReconcilerImpl(customResource *brokerv1beta1.ActiveMQArtemis, logger logr.Logger, schemeArg *runtime.Scheme) *ActiveMQArtemisReconcilerImpl {
@@ -111,6 +113,7 @@ func NewActiveMQArtemisReconcilerImpl(customResource *brokerv1beta1.ActiveMQArte
 		log:            logger,
 		customResource: customResource,
 		scheme:         schemeArg,
+		PemCfgMap:      map[string]bool{},
 	}
 }
 
@@ -121,8 +124,8 @@ type ValueInfo struct {
 }
 
 type ActiveMQArtemisIReconciler interface {
-	Process(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, firstTime bool) uint32
-	ProcessStatefulSet(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, log logr.Logger, firstTime bool) (*appsv1.StatefulSet, bool)
+	Process(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme) error
+	ProcessStatefulSet(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, log logr.Logger) (*appsv1.StatefulSet, error)
 	ProcessCredentials(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint32
 	ProcessDeploymentPlan(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet, firstTime bool) uint32
 	ProcessAcceptorsAndConnectors(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint32
@@ -151,9 +154,19 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) Process(customResource *brokerv
 
 	reconciler.ProcessCredentials(customResource, namer, client, scheme, desiredStatefulSet)
 
-	reconciler.ProcessAcceptorsAndConnectors(customResource, namer, client, scheme, desiredStatefulSet)
+	err = reconciler.ProcessAcceptorsAndConnectors(customResource, namer, client, scheme, desiredStatefulSet)
 
-	reconciler.ProcessConsole(customResource, namer, client, scheme, desiredStatefulSet)
+	if err != nil {
+		reconciler.log.Error(err, "error processing acceptors and connectors")
+		return err
+	}
+
+	err = reconciler.ProcessConsole(customResource, namer, client, scheme, desiredStatefulSet)
+
+	if err != nil {
+		reconciler.log.Error(err, "Error processing console")
+		return err
+	}
 
 	// mods to env var values sourced from secrets are not detected by process resources
 	// track updates in trigger env var that has a total checksum
@@ -374,10 +387,16 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) applyPodDisruptionBudget(custom
 	reconciler.trackDesired(desired)
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) error {
 
-	acceptorEntry := generateAcceptorsString(customResource, namer, client)
-	connectorEntry := generateConnectorsString(customResource, namer, client)
+	acceptorEntry, err := reconciler.generateAcceptorsString(customResource, namer, client, currentStatefulSet)
+	if err != nil {
+		return err
+	}
+	connectorEntry, err := reconciler.generateConnectorsString(customResource, namer, client, currentStatefulSet)
+	if err != nil {
+		return err
+	}
 
 	reconciler.configureAcceptorsExposure(customResource, namer, client, scheme)
 	reconciler.configureConnectorsExposure(customResource, namer, client, scheme)
@@ -396,24 +415,51 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(c
 
 	secretName := namer.SecretsNettyNameBuilder.Name()
 	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme)
+	return nil
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) error {
 
 	reconciler.configureConsoleExposure(customResource, namer, client, scheme)
 	if !customResource.Spec.Console.SSLEnabled {
-		return
+		return nil
 	}
 
+	var err error
+
 	secretName := namer.SecretsConsoleNameBuilder.Name()
+	if customResource.Spec.Console.SSLSecret != "" {
+		secretName = customResource.Spec.Console.SSLSecret
+	}
 
-	envVars := map[string]ValueInfo{"AMQ_CONSOLE_ARGS": {
-		Value:    generateConsoleSSLFlags(customResource, namer, client, secretName),
-		AutoGen:  true,
-		Internal: true,
-	}}
+	sslArgs, sslFlags, err := reconciler.generateCommonSSLFlags(customResource, namer.LabelBuilder.Labels(), secretName, customResource.Spec.Console.TrustSecret, customResource.Spec.Console.KeyStoreType, customResource.Spec.Console.TrustStoreType, client, currentStatefulSet, true)
+	if err != nil {
+		return err
+	}
 
-	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme)
+	if sslArgs != nil && len(sslArgs.PemCfgs) > 2 {
+		reconciler.addCreatePemConfigFileCmds(currentStatefulSet, sslArgs.PemCfgs)
+		reconciler.appendSystemPropertiesForConsole(currentStatefulSet, sslArgs.ToSystemProperties(currentStatefulSet))
+	} else {
+		envVars := map[string]ValueInfo{"AMQ_CONSOLE_ARGS": {
+			Value:    sslFlags,
+			AutoGen:  true,
+			Internal: true,
+		}}
+
+		reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme)
+	}
+
+	return nil
+}
+
+func (r *ActiveMQArtemisReconcilerImpl) appendSystemPropertiesForConsole(currentSS *appsv1.StatefulSet, systemArgs string) {
+	r.log.Info("Appending console system prop", "value", systemArgs)
+	consoleProps := corev1.EnvVar{
+		Name:  "JAVA_ARGS_APPEND",
+		Value: systemArgs,
+	}
+	environments.CreateOrAppend(currentSS.Spec.Template.Spec.Containers, &consoleProps)
 }
 
 func (r *ActiveMQArtemisReconcilerImpl) syncMessageMigration(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme) {
@@ -511,9 +557,9 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 		}
 	}
 
-	secretDefinition := secrets.NewSecret(namespacedName, secretName, stringDataMap, namer.LabelBuilder.Labels())
-
 	desired := false
+	secretDefinition := secrets.NewSecret(namespacedName, stringDataMap, namer.LabelBuilder.Labels())
+
 	if err := resources.Retrieve(namespacedName, client, secretDefinition); err != nil {
 		if k8serrors.IsNotFound(err) {
 			log.V(1).Info("Did not find secret", "key", namespacedName)
@@ -555,6 +601,11 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 	}
 
 	internalSecretName := secretName + "-internal"
+	internalNamespacedName := types.NamespacedName{
+		Name:      internalSecretName,
+		Namespace: currentStatefulSet.Namespace,
+	}
+
 	if len(internalStringDataMap) > 0 {
 
 		var internalSecretDefinition *corev1.Secret
@@ -563,7 +614,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 			log.V(2).Info("updating from " + internalSecretName)
 			internalSecretDefinition = obj.(*corev1.Secret)
 		} else {
-			internalSecretDefinition = secrets.NewSecret(namespacedName, internalSecretName, internalStringDataMap, namer.LabelBuilder.Labels())
+			internalSecretDefinition = secrets.NewSecret(internalNamespacedName, internalStringDataMap, namer.LabelBuilder.Labels())
 			reconciler.adoptExistingSecretWithNoOwnerRefForUpdate(customResource, internalSecretDefinition, client)
 		}
 
@@ -619,7 +670,34 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 	}
 }
 
-func generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client) string {
+func (reconciler *ActiveMQArtemisReconcilerImpl) processSSLSecret(secretName string, customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client) (*corev1.Secret, error) {
+
+	var trackedSecret *corev1.Secret = nil
+
+	// validate if secret exists
+	secretKey := types.NamespacedName{Name: secretName, Namespace: customResource.Namespace}
+	stringDataMap := map[string]string{}
+	theSecret := secrets.NewSecret(secretKey, stringDataMap, nil)
+	if err := resources.Retrieve(secretKey, client, theSecret); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("required secret not exist %s", secretName)
+	}
+
+	trackedSecret = theSecret
+	//if operator doesn't own it, don't track
+	if len(trackedSecret.OwnerReferences) > 0 {
+		for _, or := range trackedSecret.OwnerReferences {
+			if or.Kind == "ActiveMQArtemis" && or.Name == customResource.Name {
+				reconciler.trackDesired(trackedSecret)
+			}
+		}
+	}
+	return trackedSecret, nil
+}
+
+func (reconciler *ActiveMQArtemisReconcilerImpl) generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, currentSS *appsv1.StatefulSet) (string, error) {
 
 	// TODO: Optimize for the single broker configuration
 	ensureCOREOn61616Exists := true // as clustered is no longer an option but true by default
@@ -658,17 +736,30 @@ func generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, name
 			!strings.Contains(strings.ToUpper(acceptor.Protocols), "CORE") {
 			acceptorEntry = acceptorEntry + ",CORE"
 		}
+
 		if acceptor.SSLEnabled {
 			secretName := customResource.Name + "-" + acceptor.Name + "-secret"
 			if acceptor.SSLSecret != "" {
 				secretName = acceptor.SSLSecret
 			}
-			acceptorEntry = acceptorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, namer, client, secretName)
-			sslOptionalArguments := generateAcceptorSSLOptionalArguments(acceptor)
+			secretToUse, err := reconciler.processSSLSecret(secretName, customResource, client)
+			if err != nil {
+				return "", err
+			}
+
+			sslArgs, sslFlags, err := reconciler.generateCommonSSLFlags(customResource, namer.LabelBuilder.Labels(), secretToUse.Name, acceptor.TrustSecret, acceptor.KeyStoreType, acceptor.TrustStoreType, client, currentSS, false)
+			if err != nil {
+				return "", err
+			}
+			acceptorEntry = acceptorEntry + ";" + sslFlags
+
+			sslOptionalArguments := reconciler.generateAcceptorSSLOptionalArguments(acceptor, sslArgs, currentSS)
+
 			if sslOptionalArguments != "" {
 				acceptorEntry = acceptorEntry + ";" + sslOptionalArguments
 			}
 		}
+
 		if acceptor.AnycastPrefix != "" {
 			safeAnycastPrefix := strings.Replace(acceptor.AnycastPrefix, "/", "\\/", -1)
 			acceptorEntry = acceptorEntry + ";" + "anycastPrefix=" + safeAnycastPrefix
@@ -708,10 +799,10 @@ func generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, name
 		acceptorEntry = acceptorEntry + "<\\/acceptor>"
 	}
 
-	return acceptorEntry
+	return acceptorEntry, nil
 }
 
-func generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client) string {
+func (reconciler *ActiveMQArtemisReconcilerImpl) generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, currentSS *appsv1.StatefulSet) (string, error) {
 
 	connectorEntry := ""
 	connectors := customResource.Spec.Connectors
@@ -728,8 +819,20 @@ func generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, nam
 			if connector.SSLSecret != "" {
 				secretName = connector.SSLSecret
 			}
-			connectorEntry = connectorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, namer, client, secretName)
-			sslOptionalArguments := generateConnectorSSLOptionalArguments(connector)
+			secretToUse, err := reconciler.processSSLSecret(secretName, customResource, client)
+			if err != nil {
+				return "", err
+			}
+
+			sslArgs, sslOpts, err := reconciler.generateCommonSSLFlags(customResource, namer.LabelBuilder.Labels(), secretToUse.Name, connector.TrustSecret, connector.KeyStoreType, connector.TrustStoreType, client, currentSS, false)
+
+			if err != nil {
+				return "", err
+			}
+			connectorEntry = connectorEntry + "?" + sslOpts
+
+			sslOptionalArguments := reconciler.generateConnectorSSLOptionalArguments(connector, sslArgs, currentSS)
+
 			if sslOptionalArguments != "" {
 				connectorEntry = connectorEntry + ";" + sslOptionalArguments
 			}
@@ -737,7 +840,7 @@ func generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, nam
 		connectorEntry = connectorEntry + "<\\/connector>"
 	}
 
-	return connectorEntry
+	return connectorEntry, nil
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) configureAcceptorsExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, scheme *runtime.Scheme) {
@@ -1091,95 +1194,54 @@ func formatTemplatedString(customResource *brokerv1beta1.ActiveMQArtemis, templa
 	return template
 }
 
-func generateConsoleSSLFlags(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, secretName string) string {
+func (r *ActiveMQArtemisReconcilerImpl) generateCommonSSLFlags(customResource *brokerv1beta1.ActiveMQArtemis, labels map[string]string, secretName string, caSecretName *string, keyStoreType string, trustStoreType string, client rtclient.Client, currentSS *appsv1.StatefulSet, isConsole bool) (*certutil.SslArguments, string, error) {
 
-	sslFlags := ""
 	secretNamespacedName := types.NamespacedName{
 		Name:      secretName,
 		Namespace: customResource.Namespace,
 	}
-	namespacedName := types.NamespacedName{
-		Name:      customResource.Name,
-		Namespace: customResource.Namespace,
-	}
+
 	stringDataMap := map[string]string{}
-	userPasswordSecret := secrets.NewSecret(namespacedName, secretName, stringDataMap, namer.LabelBuilder.Labels())
+	sslSecret := secrets.NewSecret(secretNamespacedName, stringDataMap, labels)
 
-	keyStorePassword := "password"
-	keyStorePath := "/etc/" + secretName + "-volume/broker.ks"
-	trustStorePassword := "password"
-	trustStorePath := "/etc/" + secretName + "-volume/client.ts"
-	if err := resources.Retrieve(secretNamespacedName, client, userPasswordSecret); err == nil {
-		if string(userPasswordSecret.Data["keyStorePassword"]) != "" {
-			keyStorePassword = string(userPasswordSecret.Data["keyStorePassword"])
+	if err := resources.Retrieve(secretNamespacedName, client, sslSecret); err != nil {
+		return nil, "", err
+	}
+
+	// for trust manager ca bundle.
+	// in user secret case it can have both keystore and truststore so a separate ca bundle is optional
+	var caSecret *corev1.Secret = nil
+	if caSecretName != nil {
+		trustSecretNamespacedName := types.NamespacedName{
+			Name:      *caSecretName,
+			Namespace: customResource.Namespace,
 		}
-		if string(userPasswordSecret.Data["keyStorePath"]) != "" {
-			keyStorePath = string(userPasswordSecret.Data["keyStorePath"])
-		}
-		if string(userPasswordSecret.Data["trustStorePassword"]) != "" {
-			trustStorePassword = string(userPasswordSecret.Data["trustStorePassword"])
-		}
-		if string(userPasswordSecret.Data["trustStorePath"]) != "" {
-			trustStorePath = string(userPasswordSecret.Data["trustStorePath"])
+
+		caSecret = secrets.NewSecret(trustSecretNamespacedName, stringDataMap, labels)
+
+		if err := resources.Retrieve(trustSecretNamespacedName, client, caSecret); err != nil {
+			return nil, "", err
 		}
 	}
 
-	sslFlags = sslFlags + " " + "--ssl-key" + " " + keyStorePath
-	sslFlags = sslFlags + " " + "--ssl-key-password" + " " + keyStorePassword
-	sslFlags = sslFlags + " " + "--ssl-trust" + " " + trustStorePath
-	sslFlags = sslFlags + " " + "--ssl-trust-password" + " " + trustStorePassword
-	if customResource.Spec.Console.UseClientAuth {
-		sslFlags = sslFlags + " " + "--use-client-auth"
+	sslArgs, err := certutil.GetSslArgumentsFromSecret(sslSecret, keyStoreType, trustStoreType, caSecret, isConsole)
+	if err != nil {
+		return nil, "", err
 	}
 
-	return sslFlags
+	sslFlags := sslArgs.ToFlags()
+
+	if isConsole {
+
+		if customResource.Spec.Console.UseClientAuth {
+			sslFlags = sslFlags + " " + "--use-client-auth"
+		}
+	}
+
+	return sslArgs, sslFlags, nil
 }
 
-func generateAcceptorConnectorSSLArguments(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers, client rtclient.Client, secretName string) string {
-
-	sslArguments := "sslEnabled=true"
-	secretNamespacedName := types.NamespacedName{
-		Name:      secretName,
-		Namespace: customResource.Namespace,
-	}
-	namespacedName := types.NamespacedName{
-		Name:      customResource.Name,
-		Namespace: customResource.Namespace,
-	}
-	stringDataMap := map[string]string{}
-	userPasswordSecret := secrets.NewSecret(namespacedName, secretName, stringDataMap, namer.LabelBuilder.Labels())
-
-	keyStorePassword := "password"
-	keyStorePath := "\\/etc\\/" + secretName + "-volume\\/broker.ks"
-	trustStorePassword := "password"
-	trustStorePath := "\\/etc\\/" + secretName + "-volume\\/client.ts"
-	if err := resources.Retrieve(secretNamespacedName, client, userPasswordSecret); err == nil {
-		if string(userPasswordSecret.Data["keyStorePassword"]) != "" {
-			//noinspection GoUnresolvedReference
-			keyStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePassword"]), "/", "\\/")
-		}
-		if string(userPasswordSecret.Data["keyStorePath"]) != "" {
-			//noinspection GoUnresolvedReference
-			keyStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePath"]), "/", "\\/")
-		}
-		if string(userPasswordSecret.Data["trustStorePassword"]) != "" {
-			//noinspection GoUnresolvedReference
-			trustStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePassword"]), "/", "\\/")
-		}
-		if string(userPasswordSecret.Data["trustStorePath"]) != "" {
-			//noinspection GoUnresolvedReference
-			trustStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePath"]), "/", "\\/")
-		}
-	}
-	sslArguments = sslArguments + ";" + "keyStorePath=" + keyStorePath
-	sslArguments = sslArguments + ";" + "keyStorePassword=" + keyStorePassword
-	sslArguments = sslArguments + ";" + "trustStorePath=" + trustStorePath
-	sslArguments = sslArguments + ";" + "trustStorePassword=" + trustStorePassword
-
-	return sslArguments
-}
-
-func generateAcceptorSSLOptionalArguments(acceptor brokerv1beta1.AcceptorType) string {
+func (r *ActiveMQArtemisReconcilerImpl) generateAcceptorSSLOptionalArguments(acceptor brokerv1beta1.AcceptorType, sslArgs *certutil.SslArguments, currentSS *appsv1.StatefulSet) string {
 
 	sslOptionalArguments := ""
 
@@ -1209,8 +1271,10 @@ func generateAcceptorSSLOptionalArguments(acceptor brokerv1beta1.AcceptorType) s
 		sslOptionalArguments = sslOptionalArguments + ";" + "keyStoreProvider=" + acceptor.KeyStoreProvider
 	}
 
-	if acceptor.TrustStoreType != "" {
-		sslOptionalArguments = sslOptionalArguments + ";" + "trustStoreType=" + acceptor.TrustStoreType
+	if acceptor.KeyStoreType != "" {
+		if sslArgs != nil && len(sslArgs.PemCfgs) > 2 {
+			r.addCreatePemConfigFileCmds(currentSS, sslArgs.PemCfgs)
+		}
 	}
 
 	if acceptor.TrustStoreProvider != "" {
@@ -1220,7 +1284,19 @@ func generateAcceptorSSLOptionalArguments(acceptor brokerv1beta1.AcceptorType) s
 	return sslOptionalArguments
 }
 
-func generateConnectorSSLOptionalArguments(connector brokerv1beta1.ConnectorType) string {
+func (r *ActiveMQArtemisReconcilerImpl) addCreatePemConfigFileCmds(ss *appsv1.StatefulSet, configs []string) {
+	if _, ok := r.PemCfgMap[configs[0]]; !ok {
+		amqName := environments.Retrieve(ss.Spec.Template.Spec.InitContainers, "AMQ_NAME")
+		cfgFileLoc := brokerConfigRoot + "/" + amqName.Value + "/etc/" + configs[0]
+		cmd := " && echo \"source.key=" + configs[1] + "\" > " + cfgFileLoc
+		ss.Spec.Template.Spec.InitContainers[0].Args[1] += cmd
+		cmd = " && echo \"source.cert=" + configs[2] + "\" >> " + cfgFileLoc
+		ss.Spec.Template.Spec.InitContainers[0].Args[1] += cmd
+		r.PemCfgMap[configs[0]] = true
+	}
+}
+
+func (r *ActiveMQArtemisReconcilerImpl) generateConnectorSSLOptionalArguments(connector brokerv1beta1.ConnectorType, sslArgs *certutil.SslArguments, currentSS *appsv1.StatefulSet) string {
 
 	sslOptionalArguments := ""
 
@@ -1244,6 +1320,14 @@ func generateConnectorSSLOptionalArguments(connector brokerv1beta1.ConnectorType
 	}
 	if connector.SNIHost != "" {
 		sslOptionalArguments = sslOptionalArguments + ";" + "sniHost=" + connector.SNIHost
+	}
+
+	if connector.KeyStoreType != "" {
+		if sslArgs != nil && len(sslArgs.PemCfgs) > 2 {
+			r.addCreatePemConfigFileCmds(currentSS, sslArgs.PemCfgs)
+		} else {
+			sslOptionalArguments = sslOptionalArguments + ";" + "keyStoreType=" + connector.KeyStoreType
+		}
 	}
 
 	if connector.KeyStoreProvider != "" {
@@ -1563,7 +1647,7 @@ func addNewVolumes(existingNames map[string]string, existing *[]corev1.Volume, n
 	}
 }
 
-func (r *ActiveMQArtemisReconcilerImpl) MakeVolumes(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers) []corev1.Volume {
+func (r *ActiveMQArtemisReconcilerImpl) MakeVolumes(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers) ([]corev1.Volume, error) {
 
 	volumeDefinitions := []corev1.Volume{}
 	if customResource.Spec.DeploymentPlan.PersistenceEnabled {
@@ -1578,10 +1662,15 @@ func (r *ActiveMQArtemisReconcilerImpl) MakeVolumes(customResource *brokerv1beta
 			continue
 		}
 		secretName := customResource.Name + "-" + acceptor.Name + "-secret"
+
 		if acceptor.SSLSecret != "" {
 			secretName = acceptor.SSLSecret
 		}
 		addNewVolumes(secretVolumes, &volumeDefinitions, &secretName)
+
+		if acceptor.TrustSecret != nil {
+			addNewVolumes(secretVolumes, &volumeDefinitions, acceptor.TrustSecret)
+		}
 	}
 
 	// Scan connectors for any with sslEnabled
@@ -1594,18 +1683,21 @@ func (r *ActiveMQArtemisReconcilerImpl) MakeVolumes(customResource *brokerv1beta
 			secretName = connector.SSLSecret
 		}
 		addNewVolumes(secretVolumes, &volumeDefinitions, &secretName)
+		if connector.TrustSecret != nil {
+			addNewVolumes(secretVolumes, &volumeDefinitions, connector.TrustSecret)
+		}
 	}
 
 	if customResource.Spec.Console.SSLEnabled {
 		r.log.V(1).Info("Make volumes for ssl console exposure on k8s")
 		secretName := namer.SecretsConsoleNameBuilder.Name()
-		if customResource.Spec.Console.SSLSecret != "" {
-			secretName = customResource.Spec.Console.SSLSecret
-		}
 		addNewVolumes(secretVolumes, &volumeDefinitions, &secretName)
+		if customResource.Spec.Console.TrustSecret != nil {
+			addNewVolumes(secretVolumes, &volumeDefinitions, customResource.Spec.Console.TrustSecret)
+		}
 	}
 
-	return volumeDefinitions
+	return volumeDefinitions, nil
 }
 
 func addNewVolumeMounts(existingNames map[string]string, existing *[]corev1.VolumeMount, newVolumeMountName *string) {
@@ -1616,7 +1708,7 @@ func addNewVolumeMounts(existingNames map[string]string, existing *[]corev1.Volu
 	}
 }
 
-func (r *ActiveMQArtemisReconcilerImpl) MakeVolumeMounts(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers) []corev1.VolumeMount {
+func (r *ActiveMQArtemisReconcilerImpl) MakeVolumeMounts(customResource *brokerv1beta1.ActiveMQArtemis, namer common.Namers) ([]corev1.VolumeMount, error) {
 
 	volumeMounts := []corev1.VolumeMount{}
 	if customResource.Spec.DeploymentPlan.PersistenceEnabled {
@@ -1635,6 +1727,10 @@ func (r *ActiveMQArtemisReconcilerImpl) MakeVolumeMounts(customResource *brokerv
 			volumeMountName = acceptor.SSLSecret + "-volume"
 		}
 		addNewVolumeMounts(secretVolumeMounts, &volumeMounts, &volumeMountName)
+		if acceptor.TrustSecret != nil {
+			volMountName := *acceptor.TrustSecret + "-volume"
+			addNewVolumeMounts(secretVolumeMounts, &volumeMounts, &volMountName)
+		}
 	}
 
 	// Scan connectors for any with sslEnabled
@@ -1647,18 +1743,23 @@ func (r *ActiveMQArtemisReconcilerImpl) MakeVolumeMounts(customResource *brokerv
 			volumeMountName = connector.SSLSecret + "-volume"
 		}
 		addNewVolumeMounts(secretVolumeMounts, &volumeMounts, &volumeMountName)
+		if connector.TrustSecret != nil {
+			volMountName := *connector.TrustSecret + "-volume"
+			addNewVolumeMounts(secretVolumeMounts, &volumeMounts, &volMountName)
+		}
 	}
 
 	if customResource.Spec.Console.SSLEnabled {
 		r.log.V(1).Info("Make volume mounts for ssl console exposure on k8s")
 		volumeMountName := namer.SecretsConsoleNameBuilder.Name() + "-volume"
-		if customResource.Spec.Console.SSLSecret != "" {
-			volumeMountName = customResource.Spec.Console.SSLSecret + "-volume"
-		}
 		addNewVolumeMounts(secretVolumeMounts, &volumeMounts, &volumeMountName)
+		if customResource.Spec.Console.TrustSecret != nil {
+			volMountName := *customResource.Spec.Console.TrustSecret + "-volume"
+			addNewVolumeMounts(secretVolumeMounts, &volumeMounts, &volMountName)
+		}
 	}
 
-	return volumeMounts
+	return volumeMounts, nil
 }
 
 func MakeContainerPorts(cr *brokerv1beta1.ActiveMQArtemis) []corev1.ContainerPort {
@@ -1739,7 +1840,11 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) NewPodTemplateSpecForCR(customR
 
 	reqLogger.V(2).Info("Extra volumes", "volumes", extraVolumes)
 	reqLogger.V(2).Info("Extra mounts", "mounts", extraVolumeMounts)
-	container.VolumeMounts = reconciler.MakeVolumeMounts(customResource, namer)
+	var err error
+	container.VolumeMounts, err = reconciler.MakeVolumeMounts(customResource, namer)
+	if err != nil {
+		return nil, err
+	}
 	if len(extraVolumeMounts) > 0 {
 		container.VolumeMounts = append(container.VolumeMounts, extraVolumeMounts...)
 	}
@@ -1762,7 +1867,10 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) NewPodTemplateSpecForCR(customR
 
 	newContainersArray := []corev1.Container{}
 	podSpec.Containers = append(newContainersArray, *container)
-	brokerVolumes := reconciler.MakeVolumes(customResource, namer)
+	brokerVolumes, err := reconciler.MakeVolumes(customResource, namer)
+	if err != nil {
+		return nil, err
+	}
 	if len(extraVolumes) > 0 {
 		brokerVolumes = append(brokerVolumes, extraVolumes...)
 	}
@@ -2243,8 +2351,10 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) addResourceForBrokerProperties(
 	}
 
 	data := brokerPropertiesData(customResource.Spec.BrokerProperties)
+
 	if desired == nil {
-		secret := secrets.MakeSecret(resourceName, resourceName.Name, data, namer.LabelBuilder.Labels())
+		reconciler.log.V(1).Info("desired brokerprop secret nil, create new one", "name", resourceName.Name)
+		secret := secrets.MakeSecret(resourceName, data, namer.LabelBuilder.Labels())
 		desired = &secret
 	} else {
 		desired.StringData = data

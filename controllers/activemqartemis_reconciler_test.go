@@ -544,7 +544,8 @@ func TestProcess_TemplateIncludesLabelsServiceAndSecret(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, err := MakeNamers(cr)
+	assert.NoError(t, err)
 
 	newSS, err := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	reconciler.trackDesired(newSS)
@@ -624,7 +625,7 @@ func TestProcess_TemplateIncludesLabelsSecretRegexp(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, _ := MakeNamers(cr)
 
 	newSS, _ := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	reconciler.ProcessDeploymentPlan(cr, *namer, nil, nil, newSS)
@@ -679,7 +680,7 @@ func TestProcess_TemplateDuplicateKeyReplacesOk(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, _ := MakeNamers(cr)
 
 	newSS, _ := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	reconciler.ProcessDeploymentPlan(cr, *namer, nil, nil, newSS)
@@ -729,10 +730,9 @@ func TestProcess_TemplateKeyValue(t *testing.T) {
 				},
 			},
 			Acceptors: []brokerv1beta1.AcceptorType{{
-				Name:       "aa",
-				Port:       563,
-				Expose:     true,
-				SSLEnabled: true,
+				Name:   "aa",
+				Port:   563,
+				Expose: true,
 			}},
 		},
 	}
@@ -743,7 +743,8 @@ func TestProcess_TemplateKeyValue(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, err := MakeNamers(cr)
+	assert.NoError(t, err)
 
 	newSS, _ := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	reconciler.trackDesired(newSS)
@@ -752,7 +753,7 @@ func TestProcess_TemplateKeyValue(t *testing.T) {
 	reconciler.ProcessAcceptorsAndConnectors(cr, *namer,
 		fakeClient, nil, newSS)
 
-	err := reconciler.ProcessResources(cr, fakeClient, nil)
+	err = reconciler.ProcessResources(cr, fakeClient, nil)
 	assert.NoError(t, err)
 
 	var secretFound = false
@@ -784,7 +785,7 @@ func TestProcess_TemplateKeyValue(t *testing.T) {
 		}
 
 		if ingress, ok := resource.(*netv1.Ingress); ok {
-			assert.True(t, len(ingress.Annotations) >= 2)
+			assert.True(t, len(ingress.Annotations) >= 1)
 			assert.Equal(t, ingress.Annotations["myIngressKey-cr"], "myValue-0", resource.GetName())
 		}
 
@@ -820,7 +821,7 @@ func TestProcess_TemplateCustomAttributeIngress(t *testing.T) {
 				Name:       "aa",
 				Port:       563,
 				Expose:     true,
-				SSLEnabled: true,
+				SSLEnabled: false,
 			}},
 		},
 	}
@@ -831,7 +832,8 @@ func TestProcess_TemplateCustomAttributeIngress(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, err := MakeNamers(cr)
+	assert.NoError(t, err)
 
 	newSS, _ := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	reconciler.trackDesired(newSS)
@@ -840,14 +842,14 @@ func TestProcess_TemplateCustomAttributeIngress(t *testing.T) {
 	reconciler.ProcessAcceptorsAndConnectors(cr, *namer,
 		fakeClient, nil, newSS)
 
-	err := reconciler.ProcessResources(cr, fakeClient, nil)
+	err = reconciler.ProcessResources(cr, fakeClient, nil)
 	assert.NoError(t, err)
 
 	var ingressOk = false
 	for _, resource := range reconciler.requestedResources {
 
 		if ingress, ok := resource.(*netv1.Ingress); ok {
-			assert.True(t, len(ingress.Annotations) >= 2)
+			assert.True(t, len(ingress.Annotations) >= 1)
 			assert.Equal(t, ingress.Annotations["myIngressKey-cr"], "myValue-0", resource.GetName())
 			assert.NotNil(t, ingress.Spec.IngressClassName)
 			assert.Equal(t, *ingress.Spec.IngressClassName, ingressClassVal)
@@ -883,7 +885,7 @@ func TestProcess_TemplateCustomAttributeMisSpellingIngress(t *testing.T) {
 				Name:       "aa",
 				Port:       563,
 				Expose:     true,
-				SSLEnabled: true,
+				SSLEnabled: false,
 			}},
 		},
 	}
@@ -894,7 +896,8 @@ func TestProcess_TemplateCustomAttributeMisSpellingIngress(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, err := MakeNamers(cr)
+	assert.NoError(t, err)
 	newSS, err := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	assert.NoError(t, err)
 
@@ -947,13 +950,14 @@ func TestProcess_TemplateCustomAttributeContainerSecurityContext(t *testing.T) {
 		scheme.Scheme,
 	)
 
-	namer := MakeNamers(cr)
+	namer, err := MakeNamers(cr)
+	assert.NoError(t, err)
 
 	newSS, _ := reconciler.ProcessStatefulSet(cr, *namer, nil)
 	reconciler.trackDesired(newSS)
 
 	fakeClient := fake.NewClientBuilder().Build()
-	err := reconciler.ProcessResources(cr, fakeClient, nil)
+	err = reconciler.ProcessResources(cr, fakeClient, nil)
 	assert.NoError(t, err)
 
 	var runAsRootOk = false

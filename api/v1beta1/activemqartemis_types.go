@@ -509,6 +509,9 @@ type AcceptorType struct {
 	// Whether to let the acceptor to bind to all interfaces
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Bind To All Interfaces",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	BindToAllInterfaces *bool `json:"bindToAllInterfaces,omitempty"`
+	// Type of keystore being used; "JKS", "JCEKS", "PKCS12", etc. Default in broker is "JKS"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KeyStore Type",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	KeyStoreType string `json:"keyStoreType,omitempty"`
 	// Provider used for the keystore; "SUN", "SunJCE", etc. Default is null
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KeyStore Provider",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	KeyStoreProvider string `json:"keyStoreProvider,omitempty"`
@@ -521,6 +524,9 @@ type AcceptorType struct {
 	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
+	// The name of the truststore secret.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Trust Secret",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	TrustSecret *string `json:"trustSecret,omitempty"`
 }
 
 type ConnectorType struct {
@@ -566,6 +572,9 @@ type ConnectorType struct {
 	// Whether or not to expose this connector
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Expose",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:booleanSwitch"}
 	Expose bool `json:"expose,omitempty"`
+	// Type of keystore being used; "JKS", "JCEKS", "PKCS12", etc. Default in broker is "JKS"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KeyStore Type",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	KeyStoreType string `json:"keyStoreType,omitempty"`
 	// Provider used for the keystore; "SUN", "SunJCE", etc. Default is null
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KeyStore Provider",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	KeyStoreProvider string `json:"keyStoreProvider,omitempty"`
@@ -578,6 +587,9 @@ type ConnectorType struct {
 	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
+	// The name of the truststore secret.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Trust Secret",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	TrustSecret *string `json:"trustSecret,omitempty"`
 }
 
 type ConsoleType struct {
@@ -599,6 +611,15 @@ type ConsoleType struct {
 	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
+	// The name of the truststore secret.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Trust Secret",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	TrustSecret *string `json:"trustSecret,omitempty"`
+	// Type of keystore being used; "JKS", "JCEKS", "PKCS12", etc. Default in broker is "JKS"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KeyStore Type",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	KeyStoreType string `json:"keyStoreType,omitempty"`
+	// Type of truststore being used; "JKS", "JCEKS", "PKCS12", etc. Default in broker is "JKS"
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="TrustStore Type",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	TrustStoreType string `json:"trustStoreType,omitempty"`
 }
 
 // ActiveMQArtemis App product upgrade flags, this is deprecated in v1beta1, specifying the Version is sufficient

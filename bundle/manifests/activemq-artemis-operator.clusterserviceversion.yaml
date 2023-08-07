@@ -474,6 +474,12 @@ spec:
         path: acceptors[0].bindToAllInterfaces
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: The name and namespace of the certificate from cert-manager.
+          It should be a string separated by a colon
+        displayName: Broker Certificate
+        path: acceptors[0].brokerCert
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Max number of connections allowed to make
         displayName: Connections Allowed
         path: acceptors[0].connectionsAllowed
@@ -998,6 +1004,12 @@ spec:
       - description: Specifies connectors and connector configuration
         displayName: Connectors
         path: connectors
+      - description: The name and namespace of the certificate from cert-manager.
+          It should be a string separated by a colon
+        displayName: Broker Certificate
+        path: connectors[0].brokerCert
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Comma separated list of cipher suites used for SSL communication.
         displayName: Enabled Cipher Suites
         path: connectors[0].enabledCipherSuites

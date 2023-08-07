@@ -968,20 +968,19 @@ so that the PodDisruptionBudget matches the broker statefulset.
 
 The operator provides options in the custom resource that utilizes cert-manager x509 certificates to configure SSL/TLS transports for brokers.
 
-### Configuring SSL/TLS for management consoles
-
 For a certificate to be used by broker, it has to have the keystore configured in it(either `pkcs12` or `jks`). For example:
 
 ```yaml
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: console-server-cert-pkcs12
+  name: server-cert-pkcs12
+  namespace: my-cert
 spec:
   commonName: "artemiscloud.io"
   dnsNames:
     - "artemis-broker-ss-0"
-  secretName: console-server-cert-secret
+  secretName: server-cert-pkcs12-secret
   subject:
     organizations:
     - "www.artemiscloud.io"
@@ -992,10 +991,12 @@ spec:
         name: keystore-password-secret
         key: pkcs12-password
   issuerRef:
-    name: test-selfsign-issuer
-    kind: Issuer
+    name: test-selfsign-cluster-issuer
+    kind: ClusterIssuer
 ```
-In the above certificate the pkcs12 keystore is configured and its password is stored in a secret named `keystore-password-secret` and the key is `pkcs12-password`. This secret must exists in order for the certificate to be successfully created, and password secret should be in the same namespace as the certificate's.
+The above yaml represents a certificate named `server-cert-pkcs12` in namespace `my-cert`. The pkcs12 keystore is configured and its password is stored in a secret named `keystore-password-secret` and the key is `pkcs12-password`. This secret must exists in order for the certificate to be successfully created, and password secret should be in the same namespace as the certificate's.
+
+### Configuring SSL/TLS for management console
 
 Once you have the certificate ready you can configure the management console of the broker to used it:
 
@@ -1008,18 +1009,67 @@ spec:
   console:
     expose: true
     sslEnabled: true
-    serverCert: console-server-cert-pkcs12
+    brokerCert: server-cert-pkcs12:my-cert
   deploymentPlan:
     size: 1
 ```
 
-The above broker cr configures a broker that has a SSL/TLS secured management console whose keystore and truststore are generated from certificate `console-server-cert-pkcs12` in the same namespace as the broker cr.
+The above broker cr configures a broker that has a SSL/TLS secured management console whose keystore and truststore are generated from certificate `server-cert-pkcs12` in namespace `my-cert`.
 
-If the certificate is in a different namespace from the broker cr it needs to be specified in the `serverCert` option, using a colon to separate it from the cert name:
+If the certificate is in a different namespace from the broker cr it needs to be specified in the `brokerCert` option, using a colon to separate it from the cert name:
 
 ```yaml
-  serverCert: console-server-cert-pkcs12:[certnamespace]
+  serverCert: console-server-cert-pkcs12:my-cert
 ```
+
+If you don't specify the namespace, it assumes the certificate is in the same namespace as that of the broker CR.
+
+### Configuring SSL/TLS for acceptors and connectors
+
+With the certificate ready you can configure an acceptor and/or connector of the broker to used it:
+
+```yaml
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+spec:
+  acceptors:
+  - name: new-acceptor
+    port: 62666
+    protocols: all
+    sslSecret: acceptor-ssl-secret
+    expose: true
+    sslEnabled: true
+    brokerCert: server-cert-pkcs12:my-cert
+  deploymentPlan:
+    size: 1
+```
+
+The above broker cr configures a broker that has a SSL/TLS secured acceptor called `new-acceptor` whose keystore and truststore are generated from certificate `server-cert-pkcs12` in namespace `my-cert`.
+
+You can configure a connector with ssl parameters from a certificate in like manner, for example the following yaml configures a connector called `new-connector` with the certificated above mentioned:
+
+```yaml
+apiVersion: broker.amq.io/v1beta1
+kind: ActiveMQArtemis
+metadata:
+  name: artemis-broker
+spec:
+  connectors:
+  - name: new-connector
+    host: artemis-broker-ss-0
+    port: 62666
+    enabledProtocols: all
+    sslSecret: connector-ssl-secret
+    expose: true
+    sslEnabled: true
+    brokerCert: server-cert-pkcs12:my-cert
+  deploymentPlan:
+    size: 1
+```
+
+Note: Unless the certificate is in the same namespace as the operator's, it is required that the operator be installed watching all namespaces in order for the operator to be able to retrieve the certificate.
 
 For details on how to use cert-manager to manage your certificates please refer to its [documentation](https://cert-manager.io/docs/).
 

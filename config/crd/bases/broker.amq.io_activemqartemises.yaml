@@ -49,6 +49,10 @@ spec:
                     bindToAllInterfaces:
                       description: Whether to let the acceptor to bind to all interfaces
                       type: boolean
+                    brokerCert:
+                      description: The name and namespace of the certificate from
+                        cert-manager. It should be a string separated by a colon
+                      type: string
                     connectionsAllowed:
                       description: Max number of connections allowed to make
                       type: integer
@@ -465,6 +469,10 @@ spec:
                 description: Specifies connectors and connector configuration
                 items:
                   properties:
+                    brokerCert:
+                      description: The name and namespace of the certificate from
+                        cert-manager. It should be a string separated by a colon
+                      type: string
                     enabledCipherSuites:
                       description: Comma separated list of cipher suites used for
                         SSL communication.

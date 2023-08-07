@@ -6457,14 +6457,19 @@ var _ = Describe("artemis controller", func() {
 				Size: common.Int32ToPtr(1),
 			}
 			keyStoreProvider := "SunJCE"
+			acceptorName := "new-acceptor"
 			cr.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 				{
-					Name:             "new-acceptor",
+					Name:             acceptorName,
 					Port:             61666,
 					SSLEnabled:       true,
 					KeyStoreProvider: keyStoreProvider,
 				},
 			}
+			sslSecretName := cr.Name + "-" + acceptorName + "-secret"
+			sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
 			Expect(k8sClient.Create(ctx, &cr)).Should(Succeed())
 
 			ssNamespacedName := types.NamespacedName{Name: namer.CrToSS(cr.Name), Namespace: defaultNamespace}
@@ -6487,7 +6492,7 @@ var _ = Describe("artemis controller", func() {
 						g.Expect(err).To(BeNil())
 						data := secret.Data[envVar.ValueFrom.SecretKeyRef.Key]
 						By("Checking data:" + string(data))
-						g.Expect(strings.Contains(string(data), "ACCEPTOR_IP:61666")).To(BeTrue())
+						g.Expect(strings.Contains(string(data), "ACCEPTOR_IP:61666")).To(BeTrue(), string(data))
 						checkSecretHasCorrectKeyValue(g, secretName, namespaceName, envVar.ValueFrom.SecretKeyRef.Key, "keyStoreProvider=SunJCE")
 					}
 				}
@@ -6495,6 +6500,7 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			CleanResource(&cr, cr.Name, defaultNamespace)
+			CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
 		})
 
 		It("Testing acceptor trustStoreType being set and unset", func() {
@@ -6506,6 +6512,7 @@ var _ = Describe("artemis controller", func() {
 				Size: common.Int32ToPtr(1),
 			}
 			trustStoreType := "JCEKS"
+			acceptorName := "new-acceptor"
 			cr.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 				{
 					Name:           "new-acceptor",
@@ -6514,6 +6521,10 @@ var _ = Describe("artemis controller", func() {
 					TrustStoreType: trustStoreType,
 				},
 			}
+			sslSecretName := cr.Name + "-" + acceptorName + "-secret"
+			sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
 			Expect(k8sClient.Create(ctx, &cr)).Should(Succeed())
 
 			ssResourceVersionWithSslEnabled := ""
@@ -6597,6 +6608,7 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			CleanResource(&cr, cr.Name, defaultNamespace)
+			CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
 		})
 
 		It("Testing acceptor trustStoreProvider being set", func() {
@@ -6608,6 +6620,7 @@ var _ = Describe("artemis controller", func() {
 				Size: common.Int32ToPtr(1),
 			}
 			trustStoreProvider := "SUN"
+			acceptorName := "new-acceptor"
 			cr.Spec.Acceptors = []brokerv1beta1.AcceptorType{
 				{
 					Name:               "new-acceptor",
@@ -6616,6 +6629,11 @@ var _ = Describe("artemis controller", func() {
 					TrustStoreProvider: trustStoreProvider,
 				},
 			}
+			sslSecretName := cr.Name + "-" + acceptorName + "-secret"
+			sslSecret, err := CreateTlsSecret(sslSecretName, defaultNamespace, "password", nil)
+			Expect(err).To(BeNil())
+			Expect(k8sClient.Create(ctx, sslSecret)).Should(Succeed())
+
 			Expect(k8sClient.Create(ctx, &cr)).Should(Succeed())
 
 			ssNamespacedName := types.NamespacedName{Name: namer.CrToSS(cr.Name), Namespace: defaultNamespace}
@@ -6645,6 +6663,7 @@ var _ = Describe("artemis controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			CleanResource(&cr, cr.Name, defaultNamespace)
+			CleanResource(sslSecret, sslSecret.Name, defaultNamespace)
 		})
 	})
 

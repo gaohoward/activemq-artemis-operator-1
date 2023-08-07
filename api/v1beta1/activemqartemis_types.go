@@ -485,6 +485,9 @@ type AcceptorType struct {
 	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
+	// The name and namespace of the certificate from cert-manager. It should be a string separated by a colon
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Broker Certificate",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	BrokerCert *string `json:"brokerCert,omitempty"`
 }
 
 type ConnectorType struct {
@@ -542,6 +545,9 @@ type ConnectorType struct {
 	// Host for Ingress and Route resources of the acceptor. It supports the following variables: $(CR_NAME), $(CR_NAMESPACE), $(BROKER_ORDINAL), $(ITEM_NAME), $(RES_NAME) and $(INGRESS_DOMAIN). Default is $(CR_NAME)-$(ITEM_NAME)-$(BROKER_ORDINAL)-svc-$(RES_TYPE).$(INGRESS_DOMAIN)
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Ingress Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	IngressHost string `json:"ingressHost,omitempty"`
+	// The name and namespace of the certificate from cert-manager. It should be a string separated by a colon
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Broker Certificate",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	BrokerCert *string `json:"brokerCert,omitempty"`
 }
 
 type ConsoleType struct {

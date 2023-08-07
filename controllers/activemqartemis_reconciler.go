@@ -146,7 +146,12 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) Process(customResource *brokerv
 
 	reconciler.ProcessCredentials(customResource, namer, client, scheme, desiredStatefulSet)
 
-	reconciler.ProcessAcceptorsAndConnectors(customResource, namer, client, scheme, desiredStatefulSet)
+	err = reconciler.ProcessAcceptorsAndConnectors(customResource, namer, client, scheme, desiredStatefulSet)
+
+	if err != nil {
+		log.Error(err, "error processing acceptors and connectors")
+		return err
+	}
 
 	err = reconciler.ProcessConsole(customResource, namer, client, scheme, desiredStatefulSet)
 
@@ -357,10 +362,16 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) applyPodDisruptionBudget(custom
 	reconciler.trackDesired(desired)
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) error {
 
-	acceptorEntry := generateAcceptorsString(customResource, namer, client)
-	connectorEntry := generateConnectorsString(customResource, namer, client)
+	acceptorEntry, err := reconciler.generateAcceptorsString(customResource, namer, client)
+	if err != nil {
+		return err
+	}
+	connectorEntry, err := reconciler.generateConnectorsString(customResource, namer, client)
+	if err != nil {
+		return err
+	}
 
 	reconciler.configureAcceptorsExposure(customResource, namer, client, scheme)
 	reconciler.configureConnectorsExposure(customResource, namer, client, scheme)
@@ -379,6 +390,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(c
 
 	secretName := namer.SecretsNettyNameBuilder.Name()
 	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, false)
+	return nil
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) error {
@@ -637,7 +649,60 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 
 }
 
-func generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client) string {
+func (reconciler *ActiveMQArtemisReconcilerImpl) processSSLSecret(secretName string, brokerCert *string, customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client) (*corev1.Secret, error) {
+	// validate if secret exists
+	secretExists := true
+	secretKey := types.NamespacedName{Name: secretName, Namespace: customResource.Namespace}
+	stringDataMap := map[string]string{}
+	theSecret := secrets.NewSecret(secretKey, secretName, stringDataMap, nil)
+	if err := resources.Retrieve(secretKey, client, theSecret); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return nil, err
+		}
+		secretExists = false
+	}
+
+	var trackedSecret *corev1.Secret = nil
+
+	if brokerCert == nil {
+		if !secretExists {
+			return nil, fmt.Errorf("required secret not exist %s", secretName)
+		}
+		trackedSecret = theSecret
+		//if operator doesn't own it, don't track
+		if len(trackedSecret.OwnerReferences) > 0 {
+			for _, or := range trackedSecret.OwnerReferences {
+				if or.Kind == "ActiveMQArtemis" && or.Name == customResource.Name {
+					reconciler.trackDesired(trackedSecret)
+				}
+			}
+		}
+	} else {
+		cert, err := certutil.GetCertificate(brokerCert, customResource, client)
+		if err != nil {
+			return nil, err
+		}
+
+		newSecret, err := reconciler.MakeSecretFromCertTlsSecret(cert, secretName, customResource.Namespace, client)
+
+		if err != nil {
+			clog.Error(err, "failed to make console secret. should report a condition here!")
+			return nil, err
+		}
+		sslSecret := reconciler.cloneOfDeployed(reflect.TypeOf(corev1.Secret{}), secretName)
+		if sslSecret == nil {
+			trackedSecret = newSecret
+		} else {
+			trackedSecret = sslSecret.(*corev1.Secret)
+			trackedSecret.StringData = nil
+			trackedSecret.Data = newSecret.Data
+		}
+		reconciler.trackDesired(trackedSecret)
+	}
+	return trackedSecret, nil
+}
+
+func (reconciler *ActiveMQArtemisReconcilerImpl) generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client) (string, error) {
 
 	// TODO: Optimize for the single broker configuration
 	ensureCOREOn61616Exists := true // as clustered is no longer an option but true by default
@@ -681,7 +746,12 @@ func generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, name
 			if acceptor.SSLSecret != "" {
 				secretName = acceptor.SSLSecret
 			}
-			acceptorEntry = acceptorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, namer, client, secretName)
+			secretToUse, err := reconciler.processSSLSecret(secretName, acceptor.BrokerCert, customResource, client)
+			if err != nil {
+				return "", err
+			}
+
+			acceptorEntry = acceptorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, namer, client, secretToUse)
 			sslOptionalArguments := generateAcceptorSSLOptionalArguments(acceptor)
 			if sslOptionalArguments != "" {
 				acceptorEntry = acceptorEntry + ";" + sslOptionalArguments
@@ -725,10 +795,10 @@ func generateAcceptorsString(customResource *brokerv1beta1.ActiveMQArtemis, name
 		acceptorEntry = acceptorEntry + "<\\/acceptor>"
 	}
 
-	return acceptorEntry
+	return acceptorEntry, nil
 }
 
-func generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client) string {
+func (reconciler *ActiveMQArtemisReconcilerImpl) generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client) (string, error) {
 
 	connectorEntry := ""
 	connectors := customResource.Spec.Connectors
@@ -745,7 +815,11 @@ func generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, nam
 			if connector.SSLSecret != "" {
 				secretName = connector.SSLSecret
 			}
-			connectorEntry = connectorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, namer, client, secretName)
+			secretToUse, err := reconciler.processSSLSecret(secretName, connector.BrokerCert, customResource, client)
+			if err != nil {
+				return "", nil
+			}
+			connectorEntry = connectorEntry + ";" + generateAcceptorConnectorSSLArguments(customResource, namer, client, secretToUse)
 			sslOptionalArguments := generateConnectorSSLOptionalArguments(connector)
 			if sslOptionalArguments != "" {
 				connectorEntry = connectorEntry + ";" + sslOptionalArguments
@@ -754,7 +828,7 @@ func generateConnectorsString(customResource *brokerv1beta1.ActiveMQArtemis, nam
 		connectorEntry = connectorEntry + "<\\/connector>"
 	}
 
-	return connectorEntry
+	return connectorEntry, nil
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) configureAcceptorsExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) {
@@ -985,41 +1059,30 @@ func generateConsoleSSLFlags(customResource *brokerv1beta1.ActiveMQArtemis, name
 	return sslFlags
 }
 
-func generateAcceptorConnectorSSLArguments(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, secretName string) string {
+func generateAcceptorConnectorSSLArguments(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, userPasswordSecret *corev1.Secret) string {
 
 	sslArguments := "sslEnabled=true"
-	secretNamespacedName := types.NamespacedName{
-		Name:      secretName,
-		Namespace: customResource.Namespace,
-	}
-	namespacedName := types.NamespacedName{
-		Name:      customResource.Name,
-		Namespace: customResource.Namespace,
-	}
-	stringDataMap := map[string]string{}
-	userPasswordSecret := secrets.NewSecret(namespacedName, secretName, stringDataMap, namer.LabelBuilder.Labels())
 
 	keyStorePassword := "password"
-	keyStorePath := "\\/etc\\/" + secretName + "-volume\\/broker.ks"
+	keyStorePath := "\\/etc\\/" + userPasswordSecret.Name + "-volume\\/broker.ks"
 	trustStorePassword := "password"
-	trustStorePath := "\\/etc\\/" + secretName + "-volume\\/client.ts"
-	if err := resources.Retrieve(secretNamespacedName, client, userPasswordSecret); err == nil {
-		if string(userPasswordSecret.Data["keyStorePassword"]) != "" {
-			//noinspection GoUnresolvedReference
-			keyStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePassword"]), "/", "\\/")
-		}
-		if string(userPasswordSecret.Data["keyStorePath"]) != "" {
-			//noinspection GoUnresolvedReference
-			keyStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePath"]), "/", "\\/")
-		}
-		if string(userPasswordSecret.Data["trustStorePassword"]) != "" {
-			//noinspection GoUnresolvedReference
-			trustStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePassword"]), "/", "\\/")
-		}
-		if string(userPasswordSecret.Data["trustStorePath"]) != "" {
-			//noinspection GoUnresolvedReference
-			trustStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePath"]), "/", "\\/")
-		}
+	trustStorePath := "\\/etc\\/" + userPasswordSecret.Name + "-volume\\/client.ts"
+
+	if string(userPasswordSecret.Data["keyStorePassword"]) != "" {
+		//noinspection GoUnresolvedReference
+		keyStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePassword"]), "/", "\\/")
+	}
+	if string(userPasswordSecret.Data["keyStorePath"]) != "" {
+		//noinspection GoUnresolvedReference
+		keyStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["keyStorePath"]), "/", "\\/")
+	}
+	if string(userPasswordSecret.Data["trustStorePassword"]) != "" {
+		//noinspection GoUnresolvedReference
+		trustStorePassword = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePassword"]), "/", "\\/")
+	}
+	if string(userPasswordSecret.Data["trustStorePath"]) != "" {
+		//noinspection GoUnresolvedReference
+		trustStorePath = strings.ReplaceAll(string(userPasswordSecret.Data["trustStorePath"]), "/", "\\/")
 	}
 	sslArguments = sslArguments + ";" + "keyStorePath=" + keyStorePath
 	sslArguments = sslArguments + ";" + "keyStorePassword=" + keyStorePassword

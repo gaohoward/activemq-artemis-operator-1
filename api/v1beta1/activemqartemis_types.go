@@ -488,6 +488,9 @@ type AcceptorType struct {
 	// The name and namespace of the certificate from cert-manager. It should be a string separated by a colon
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Broker Certificate",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	BrokerCert *string `json:"brokerCert,omitempty"`
+	// When exposed how to configure tls on ingress/route.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="TLS Termination"
+	TlsTermination TlsTerminationType `json:"tlsTermination,omitempty"`
 }
 
 type ConnectorType struct {
@@ -548,6 +551,9 @@ type ConnectorType struct {
 	// The name and namespace of the certificate from cert-manager. It should be a string separated by a colon
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Broker Certificate",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	BrokerCert *string `json:"brokerCert,omitempty"`
+	// When exposed how to configure tls on ingress/route.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="TLS Termination"
+	TlsTermination TlsTerminationType `json:"tlsTermination,omitempty"`
 }
 
 type ConsoleType struct {
@@ -572,6 +578,18 @@ type ConsoleType struct {
 	// The name and namespace of the certificate from cert-manager. It should be a string separated by a colon
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Broker Certificate",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	BrokerCert *string `json:"brokerCert,omitempty"`
+	// When console exposed how to configure tls on ingress/route.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="TLS Termination"
+	TlsTermination TlsTerminationType `json:"tlsTermination,omitempty"`
+}
+
+type TlsTerminationType struct {
+	// what kind of tls termination should be used: passthrough, edge or reencrypt. Default is passthrough
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Termination Type",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	Type *string `json:"type,omitempty"`
+	// This is an array of key-value pairs that go to ingress or route annotations
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Annotations"
+	Annotations []KeyValueType `json:"annotations,omitempty"`
 }
 
 // ActiveMQArtemis App product upgrade flags, this is deprecated in v1beta1, specifying the Version is sufficient

@@ -574,6 +574,29 @@ spec:
         path: acceptors[0].suppressInternalManagementObjects
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:booleanSwitch
+      - description: When exposed how to configure tls on ingress/route.
+        displayName: TLS Termination
+        path: acceptors[0].tlsTermination
+      - description: This is an array of key-value pairs that go to ingress or route
+          annotations
+        displayName: Annotations
+        path: acceptors[0].tlsTermination.annotations
+      - description: The regular expression to match the Redirect URI
+        displayName: Key
+        path: acceptors[0].tlsTermination.annotations[0].key
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: The replacement value
+        displayName: Value
+        path: acceptors[0].tlsTermination.annotations[0].value
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'what kind of tls termination should be used: passthrough, edge
+          or reencrypt. Default is passthrough'
+        displayName: Termination Type
+        path: acceptors[0].tlsTermination.type
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Provider used for the truststore; "SUN", "SunJCE", etc. Default
           in broker is null
         displayName: TrustStore Provider
@@ -1082,6 +1105,29 @@ spec:
         path: connectors[0].sslSecret
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: When exposed how to configure tls on ingress/route.
+        displayName: TLS Termination
+        path: connectors[0].tlsTermination
+      - description: This is an array of key-value pairs that go to ingress or route
+          annotations
+        displayName: Annotations
+        path: connectors[0].tlsTermination.annotations
+      - description: The regular expression to match the Redirect URI
+        displayName: Key
+        path: connectors[0].tlsTermination.annotations[0].key
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: The replacement value
+        displayName: Value
+        path: connectors[0].tlsTermination.annotations[0].value
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'what kind of tls termination should be used: passthrough, edge
+          or reencrypt. Default is passthrough'
+        displayName: Termination Type
+        path: connectors[0].tlsTermination.type
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Provider used for the truststore; "SUN", "SunJCE", etc. Default
           in broker is null
         displayName: TrustStore Provider
@@ -1145,6 +1191,29 @@ spec:
       - description: Name of the secret to use for ssl information
         displayName: SSL Secret
         path: console.sslSecret
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: When console exposed how to configure tls on ingress/route.
+        displayName: TLS Termination
+        path: console.tlsTermination
+      - description: This is an array of key-value pairs that go to ingress or route
+          annotations
+        displayName: Annotations
+        path: console.tlsTermination.annotations
+      - description: The regular expression to match the Redirect URI
+        displayName: Key
+        path: console.tlsTermination.annotations[0].key
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: The replacement value
+        displayName: Value
+        path: console.tlsTermination.annotations[0].value
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'what kind of tls termination should be used: passthrough, edge
+          or reencrypt. Default is passthrough'
+        displayName: Termination Type
+        path: console.tlsTermination.type
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
       - description: If the embedded server requires client authentication
@@ -2276,6 +2345,13 @@ spec:
           - cert-manager.io
           resources:
           - certificates
+          verbs:
+          - list
+          - watch
+        - apiGroups:
+          - cert-manager.io
+          resources:
+          - issuers
           verbs:
           - list
           - watch

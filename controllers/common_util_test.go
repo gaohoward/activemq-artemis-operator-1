@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"math/big"
@@ -633,6 +634,52 @@ func NewPriveKey() (*rsa.PrivateKey, error) {
 	return caPrivKey, nil
 }
 
+func GeneratePemCertificate(certFunc func(cert *x509.Certificate)) ([]byte, []byte, error) {
+	if caPrivKey, err := NewPriveKey(); err == nil {
+		privKeyPem := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(caPrivKey),
+		}
+
+		ca := &x509.Certificate{
+			SerialNumber: big.NewInt(202309081100),
+			Subject: pkix.Name{
+				CommonName:         "ArkMQ Operator",
+				OrganizationalUnit: []string{"Broker"},
+				Organization:       []string{"ArkMQ"},
+			},
+			NotBefore:          time.Now(),
+			NotAfter:           time.Now().AddDate(10, 0, 0),
+			IsCA:               false,
+			SignatureAlgorithm: x509.SHA256WithRSA,
+			ExtKeyUsage:        []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		}
+		if certFunc != nil {
+			certFunc(ca)
+		}
+
+		// create the self-signed CA
+		caBytes, err := x509.CreateCertificate(crand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		certPem := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: caBytes,
+		}
+
+		var keyBuf, certBuf bytes.Buffer
+		pem.Encode(&keyBuf, privKeyPem)
+		pem.Encode(&certBuf, certPem)
+
+		return keyBuf.Bytes(), certBuf.Bytes(), nil
+
+	} else {
+		return nil, nil, err
+	}
+}
+
 // generate a keystore file in bytes
 // the keystore contains a self signed cert
 func GenerateKeystore(password string, dnsNames []string) ([]byte, error) {
@@ -825,6 +872,7 @@ func InstallSelfSignedCert(certName string, namespace string, configFunc func(ca
 		},
 		Spec: cmv1.CertificateSpec{
 			SecretName: certName + "-secret",
+			CommonName: "arkmq.org",
 			DNSNames:   defaultSanDnsNames,
 			Subject: &cmv1.X509Subject{
 				Organizations: []string{"www.artemiscloud.io"},

@@ -117,6 +117,28 @@ spec:
                       description: If prevents advisory addresses/queues to be registered
                         to management service, default false
                       type: boolean
+                    tlsTermination:
+                      description: When exposed how to configure tls on ingress/route.
+                      properties:
+                        annotations:
+                          description: This is an array of key-value pairs that go
+                            to ingress or route annotations
+                          items:
+                            properties:
+                              key:
+                                description: The regular expression to match the Redirect
+                                  URI
+                                type: string
+                              value:
+                                description: The replacement value
+                                type: string
+                            type: object
+                          type: array
+                        type:
+                          description: 'what kind of tls termination should be used:
+                            passthrough, edge or reencrypt. Default is passthrough'
+                          type: string
+                      type: object
                     trustStoreProvider:
                       description: Provider used for the truststore; "SUN", "SunJCE",
                         etc. Default in broker is null
@@ -523,6 +545,28 @@ spec:
                     sslSecret:
                       description: Name of the secret to use for ssl information
                       type: string
+                    tlsTermination:
+                      description: When exposed how to configure tls on ingress/route.
+                      properties:
+                        annotations:
+                          description: This is an array of key-value pairs that go
+                            to ingress or route annotations
+                          items:
+                            properties:
+                              key:
+                                description: The regular expression to match the Redirect
+                                  URI
+                                type: string
+                              value:
+                                description: The replacement value
+                                type: string
+                            type: object
+                          type: array
+                        type:
+                          description: 'what kind of tls termination should be used:
+                            passthrough, edge or reencrypt. Default is passthrough'
+                          type: string
+                      type: object
                     trustStoreProvider:
                       description: Provider used for the truststore; "SUN", "SunJCE",
                         etc. Default in broker is null
@@ -574,6 +618,28 @@ spec:
                   sslSecret:
                     description: Name of the secret to use for ssl information
                     type: string
+                  tlsTermination:
+                    description: When console exposed how to configure tls on ingress/route.
+                    properties:
+                      annotations:
+                        description: This is an array of key-value pairs that go to
+                          ingress or route annotations
+                        items:
+                          properties:
+                            key:
+                              description: The regular expression to match the Redirect
+                                URI
+                              type: string
+                            value:
+                              description: The replacement value
+                              type: string
+                          type: object
+                        type: array
+                      type:
+                        description: 'what kind of tls termination should be used:
+                          passthrough, edge or reencrypt. Default is passthrough'
+                        type: string
+                    type: object
                   useClientAuth:
                     description: If the embedded server requires client authentication
                     type: boolean

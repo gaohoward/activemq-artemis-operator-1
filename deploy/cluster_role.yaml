@@ -157,6 +157,13 @@ rules:
   - list
   - watch
 - apiGroups:
+  - cert-manager.io
+  resources:
+  - issuers
+  verbs:
+  - list
+  - watch
+- apiGroups:
   - monitoring.coreos.com
   resources:
   - servicemonitors

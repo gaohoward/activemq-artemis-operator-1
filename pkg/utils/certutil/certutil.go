@@ -18,6 +18,8 @@ package certutil
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"strings"
 
@@ -76,4 +78,21 @@ func GetCertificate(brokerCert *string, cr *v1beta1.ActiveMQArtemis, client rtcl
 		return nil, err
 	}
 	return &cert, nil
+}
+
+func CheckIssuerExists(issuerName string, namespace *string, client rtclient.Client) error {
+	issKey := types.NamespacedName{Name: issuerName, Namespace: ""}
+	issuer := cm.Issuer{}
+	if namespace != nil {
+		issKey.Namespace = *namespace
+	}
+	if err := resources.Retrieve(issKey, client, &issuer); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ParsePemCertificate(pemCert *string, password *string) (*x509.Certificate, error) {
+	pemBlock, _ := pem.Decode([]byte(*pemCert))
+	return x509.ParseCertificate(pemBlock.Bytes)
 }

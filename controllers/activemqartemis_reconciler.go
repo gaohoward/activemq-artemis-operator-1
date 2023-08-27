@@ -3,9 +3,11 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"hash/adler32"
 	osruntime "runtime"
@@ -13,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/blang/semver/v4"
+	"software.sslmate.com/src/go-pkcs12"
 
 	"github.com/RHsyseng/operator-utils/pkg/olm"
 	"github.com/RHsyseng/operator-utils/pkg/resource/compare"
@@ -67,6 +70,7 @@ import (
 	"os"
 
 	cm "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
+	"github.com/pavlo-v-chernykh/keystore-go/v4"
 	policyv1 "k8s.io/api/policy/v1"
 )
 
@@ -120,7 +124,7 @@ type ActiveMQArtemisIReconciler interface {
 	ProcessCredentials(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint32
 	ProcessDeploymentPlan(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet, firstTime bool) uint32
 	ProcessAcceptorsAndConnectors(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint32
-	ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet)
+	ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) error
 	ProcessResources(customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) uint8
 }
 
@@ -313,7 +317,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessCredentials(customResour
 		AutoGen: true,
 	}
 
-	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, false)
+	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, nil)
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessDeploymentPlan(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) {
@@ -389,58 +393,71 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessAcceptorsAndConnectors(c
 	}
 
 	secretName := namer.SecretsNettyNameBuilder.Name()
-	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, false)
+	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, nil)
 	return nil
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) ProcessConsole(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, currentStatefulSet *appsv1.StatefulSet) error {
 
-	reconciler.configureConsoleExposure(customResource, namer, client, scheme)
-	if !customResource.Spec.Console.SSLEnabled {
-		return nil
-	}
-
+	clog.Info("[debug] processing console")
 	secretName := namer.SecretsConsoleNameBuilder.Name()
 	if customResource.Spec.Console.SSLSecret != "" {
 		secretName = customResource.Spec.Console.SSLSecret
 	}
+	clog.Info("[debug] console secret resolved", "name", secretName)
 
-	tracked := false
-	if customResource.Spec.Console.BrokerCert != nil {
-		// cert manager
-		cert, err := certutil.GetCertificate(customResource.Spec.Console.BrokerCert, customResource, client)
+	var secToUse *corev1.Secret = nil
+	if customResource.Spec.Console.SSLEnabled {
 
-		if err != nil {
-			return err
+		if customResource.Spec.Console.BrokerCert != nil {
+			clog.Info("[debug] console using cert manager", "cert", customResource.Spec.Console.BrokerCert)
+
+			// cert manager
+			cert, err := certutil.GetCertificate(customResource.Spec.Console.BrokerCert, customResource, client)
+
+			if err != nil {
+				return err
+			}
+
+			newSecret, err := reconciler.MakeSecretFromCertTlsSecret(cert, secretName, customResource.Namespace, client)
+
+			if err != nil {
+				clog.Error(err, "failed to make console secret")
+				return err
+			}
+
+			trackedSecret := &corev1.Secret{}
+			sslSecret := reconciler.cloneOfDeployed(reflect.TypeOf(corev1.Secret{}), secretName)
+			if sslSecret == nil {
+				trackedSecret = newSecret
+			} else {
+				trackedSecret = sslSecret.(*corev1.Secret)
+				trackedSecret.StringData = nil
+				trackedSecret.Data = newSecret.Data
+			}
+			reconciler.trackDesired(trackedSecret)
+			secToUse = trackedSecret
 		}
 
-		newSecret, err := reconciler.MakeSecretFromCertTlsSecret(cert, secretName, customResource.Namespace, client)
+		envVars := map[string]ValueInfo{"AMQ_CONSOLE_ARGS": {
+			Value:    generateConsoleSSLFlags(customResource, namer, client, secretName),
+			AutoGen:  true,
+			Internal: true,
+		}}
 
-		if err != nil {
-			clog.Error(err, "failed to make console secret")
-			return err
-		}
+		secCreated := reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, secToUse)
 
-		trackedSecret := &corev1.Secret{}
-		sslSecret := reconciler.cloneOfDeployed(reflect.TypeOf(corev1.Secret{}), secretName)
-		if sslSecret == nil {
-			trackedSecret = newSecret
-		} else {
-			trackedSecret = sslSecret.(*corev1.Secret)
-			trackedSecret.StringData = nil
-			trackedSecret.Data = newSecret.Data
+		if secCreated != nil {
+			secToUse = secCreated
 		}
-		reconciler.trackDesired(trackedSecret)
-		tracked = true
 	}
 
-	envVars := map[string]ValueInfo{"AMQ_CONSOLE_ARGS": {
-		Value:    generateConsoleSSLFlags(customResource, namer, client, secretName),
-		AutoGen:  true,
-		Internal: true,
-	}}
-
-	reconciler.sourceEnvVarFromSecret(customResource, namer, currentStatefulSet, &envVars, secretName, client, scheme, tracked)
+	clog.Info("[debug] expose console")
+	err := reconciler.configureConsoleExposure(customResource, namer, client, scheme, secToUse)
+	if err != nil {
+		return err
+	}
+	clog.Info("[debug] console processed ok")
 
 	return nil
 }
@@ -520,10 +537,11 @@ func isLocalOnly() bool {
 	return oprNamespace == watchNamespace
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, currentStatefulSet *appsv1.StatefulSet, envVars *map[string]ValueInfo, secretName string, client rtclient.Client, scheme *runtime.Scheme, alreadyTracked bool) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, currentStatefulSet *appsv1.StatefulSet, envVars *map[string]ValueInfo, secretName string, client rtclient.Client, scheme *runtime.Scheme, tracked *corev1.Secret) *corev1.Secret {
 
 	var log = ctrl.Log.WithName("controller_v1beta1activemqartemis").WithName("sourceEnvVarFromSecret")
 
+	log.Info("[debug] sourceEnvvar--", "tracked?", tracked, "secName", secretName)
 	namespacedName := types.NamespacedName{
 		Name:      secretName,
 		Namespace: currentStatefulSet.Namespace,
@@ -540,21 +558,47 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 		}
 	}
 
-	secretDefinition := secrets.NewSecret(namespacedName, secretName, stringDataMap, namer.LabelBuilder.Labels())
+	secretDefinition := tracked
 
-	desired := false
-	if err := resources.Retrieve(namespacedName, client, secretDefinition); err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.V(2).Info("Did not find secret", "key", namespacedName)
+	if secretDefinition == nil {
+		log.Info("[debug] secretDef is nil, create one", "name", secretName)
+		secretDefinition = secrets.NewSecret(namespacedName, secretName, stringDataMap, namer.LabelBuilder.Labels())
+		if err := resources.Retrieve(namespacedName, client, secretDefinition); err != nil {
+			if k8serrors.IsNotFound(err) {
+				log.Info("Did not find secret", "key", namespacedName)
+			} else {
+				log.Error(err, "Error while retrieving secret", "key", namespacedName)
+			}
+			if len(stringDataMap) > 0 {
+				// we need to create and track
+				reconciler.trackDesired(secretDefinition)
+			}
 		} else {
-			log.Error(err, "Error while retrieving secret", "key", namespacedName)
-		}
-		if len(stringDataMap) > 0 {
-			// we need to create and track
-			desired = true
+			log.V(1).Info("updating from "+secretName, "secdef", secretDefinition)
+			for k, envVar := range *envVars {
+				if envVar.Internal {
+					// goes in internal secret
+					continue
+				}
+				elem, exists := secretDefinition.Data[k]
+				if strings.Compare(string(elem), (*envVars)[k].Value) != 0 || !exists {
+					log.V(2).Info("key value not equals or does not exist", "key", k, "exists", exists)
+					if !(*envVars)[k].AutoGen || string(elem) == "" {
+						secretDefinition.Data[k] = []byte((*envVars)[k].Value)
+					}
+				}
+			}
+			//if operator doesn't own it, don't track
+			if len(secretDefinition.OwnerReferences) > 0 {
+				for _, or := range secretDefinition.OwnerReferences {
+					if or.Kind == "ActiveMQArtemis" && or.Name == customResource.Name {
+						reconciler.trackDesired(secretDefinition)
+					}
+				}
+			}
 		}
 	} else {
-		log.V(1).Info("updating from " + secretName)
+		log.V(1).Info("updating from cert mgr " + secretName)
 		for k, envVar := range *envVars {
 			if envVar.Internal {
 				// goes in internal secret
@@ -568,20 +612,9 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 				}
 			}
 		}
-		//if operator doesn't own it, don't track
-		if len(secretDefinition.OwnerReferences) > 0 {
-			for _, or := range secretDefinition.OwnerReferences {
-				if or.Kind == "ActiveMQArtemis" && or.Name == customResource.Name {
-					desired = true
-				}
-			}
-		}
 	}
 
-	if desired && !alreadyTracked {
-		// ensure processResources sees it
-		reconciler.trackDesired(secretDefinition)
-	}
+	log.Info("[debug] now process internal secret", "main sec", secretDefinition)
 
 	internalSecretName := secretName + "-internal"
 	if len(internalStringDataMap) > 0 {
@@ -647,6 +680,13 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) sourceEnvVarFromSecret(customRe
 		}
 	}
 
+	// return the secret if it is created in this method
+	if tracked == nil {
+		log.Info("[debug] returning created sec", "sec", secretDefinition)
+		return secretDefinition
+	}
+
+	return nil
 }
 
 func (reconciler *ActiveMQArtemisReconcilerImpl) processSSLSecret(secretName string, brokerCert *string, customResource *brokerv1beta1.ActiveMQArtemis, client rtclient.Client) (*corev1.Secret, error) {
@@ -831,7 +871,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) generateConnectorsString(custom
 	return connectorEntry, nil
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) configureAcceptorsExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) configureAcceptorsExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) error {
 	originalLabels := namer.LabelBuilder.Labels()
 	namespacedName := types.NamespacedName{
 		Name:      customResource.Name,
@@ -853,14 +893,29 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureAcceptorsExposure(cust
 			reconciler.trackDesired(serviceDefinition)
 
 			if acceptor.Expose {
-				exposureDefinition := reconciler.ExposureDefinitionForCR(customResource, namespacedName, serviceRoutelabels, acceptor.SSLEnabled, acceptor.IngressHost, ordinalString, acceptor.Name)
+				if acceptor.SSLEnabled {
+					//if sslEnabled only passthrough make sense
+					if acceptor.TlsTermination.Type != nil && *acceptor.TlsTermination.Type != routes.TLS_PASSTHROUGH {
+						return fmt.Errorf("acceptor with ssl exposure only allows tls passthrough but configured as %s", *acceptor.TlsTermination.Type)
+					}
+				} else {
+					//if not ssl tls termination type shouldn't be specified
+					if acceptor.TlsTermination.Type != nil {
+						return fmt.Errorf("acceptor without ssl exposure has tls termination type specified: %s", *acceptor.TlsTermination.Type)
+					}
+				}
+				exposureDefinition, err := reconciler.ExposureDefinitionForCR(customResource, namespacedName, serviceRoutelabels, acceptor.SSLEnabled, acceptor.IngressHost, ordinalString, acceptor.Name, acceptor.TlsTermination, client)
+				if err != nil {
+					return err
+				}
 				reconciler.trackDesired(exposureDefinition)
 			}
 		}
 	}
+	return nil
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) ExposureDefinitionForCR(customResource *brokerv1beta1.ActiveMQArtemis, namespacedName types.NamespacedName, labels map[string]string, passthroughTLS bool, ingressHost string, ordinalString string, itemName string) rtclient.Object {
+func (reconciler *ActiveMQArtemisReconcilerImpl) ExposureDefinitionForCR(customResource *brokerv1beta1.ActiveMQArtemis, namespacedName types.NamespacedName, labels map[string]string, sslEnabled bool, ingressHost string, ordinalString string, itemName string, tlsConfig brokerv1beta1.TlsTerminationType, client rtclient.Client) (rtclient.Object, error) {
 
 	targetPortName := itemName + "-" + ordinalString
 	targetServiceName := customResource.Name + "-" + targetPortName + "-svc"
@@ -874,7 +929,11 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ExposureDefinitionForCR(customR
 			existing = obj.(*routev1.Route)
 		}
 		brokerHost := formatIngressHost(customResource, ingressHost, ordinalString, itemName, "rte")
-		return routes.NewRouteDefinitionForCR(existing, namespacedName, labels, targetServiceName, targetPortName, passthroughTLS, customResource.Spec.IngressDomain, brokerHost)
+		route, err := routes.NewRouteDefinitionForCR(existing, namespacedName, labels, targetServiceName, targetPortName, customResource.Spec.IngressDomain, brokerHost, sslEnabled, tlsConfig.Type, makeAnnotations(tlsConfig.Annotations), client, nil)
+		if err != nil {
+			return nil, err
+		}
+		return route, nil
 	} else {
 		clog.Info("creating ingress for "+targetPortName, "service", targetServiceName)
 
@@ -884,7 +943,11 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) ExposureDefinitionForCR(customR
 			existing = obj.(*netv1.Ingress)
 		}
 		brokerHost := formatIngressHost(customResource, ingressHost, ordinalString, itemName, "ing")
-		return ingresses.NewIngressForCRWithSSL(existing, namespacedName, labels, targetServiceName, targetPortName, passthroughTLS, customResource.Spec.IngressDomain, brokerHost)
+		ingress, err := ingresses.NewIngressForCRWithSSL(existing, namespacedName, labels, targetServiceName, targetPortName, sslEnabled, customResource.Spec.IngressDomain, brokerHost, tlsConfig.Type, makeAnnotations(tlsConfig.Annotations), client)
+		if err != nil {
+			return nil, err
+		}
+		return ingress, nil
 	}
 }
 
@@ -892,7 +955,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) trackDesired(desired rtclient.O
 	reconciler.requestedResources = append(reconciler.requestedResources, desired)
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) configureConnectorsExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) configureConnectorsExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) error {
 	originalLabels := namer.LabelBuilder.Labels()
 	namespacedName := types.NamespacedName{
 		Name:      customResource.Name,
@@ -914,15 +977,19 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConnectorsExposure(cus
 
 			if connector.Expose {
 
-				exposureDefinition := reconciler.ExposureDefinitionForCR(customResource, namespacedName, serviceRoutelabels, connector.SSLEnabled, connector.IngressHost, ordinalString, connector.Name)
+				exposureDefinition, err := reconciler.ExposureDefinitionForCR(customResource, namespacedName, serviceRoutelabels, connector.SSLEnabled, connector.IngressHost, ordinalString, connector.Name, connector.TlsTermination, client)
+				if err != nil {
+					return err
+				}
 
 				reconciler.trackDesired(exposureDefinition)
 			}
 		}
 	}
+	return nil
 }
 
-func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme) {
+func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(customResource *brokerv1beta1.ActiveMQArtemis, namer Namers, client rtclient.Client, scheme *runtime.Scheme, secretToUse *corev1.Secret) error {
 	console := customResource.Spec.Console
 	consoleName := customResource.Spec.Console.Name
 
@@ -964,6 +1031,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(custom
 			isOpenshift := false
 			isOpenshift, _ = environments.DetectOpenshift()
 			if isOpenshift {
+				clog.Info("[debug] going to expose console on openshift")
 				clog.V(2).Info("routeDefinition for " + targetPortName)
 				var existing *routev1.Route = nil
 				obj := reconciler.cloneOfDeployed(reflect.TypeOf(routev1.Route{}), targetServiceName+"-rte")
@@ -971,7 +1039,23 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(custom
 					existing = obj.(*routev1.Route)
 				}
 				brokerHost := formatIngressHost(customResource, customResource.Spec.Console.IngressHost, ordinalString, consoleName, "rte")
-				routeDefinition := routes.NewRouteDefinitionForCR(existing, namespacedName, serviceRoutelabels, targetServiceName, targetPortName, console.SSLEnabled, customResource.Spec.IngressDomain, brokerHost)
+				if console.SSLEnabled && console.TlsTermination.Type != nil && *console.TlsTermination.Type == routes.TLS_EDGE {
+					return fmt.Errorf("console is ssl enabled but configured with edge termination type")
+				}
+
+				clog.Info("[debug] need to extract cert from console", "secret", secretToUse)
+
+				consoleCaCrt, err := extractCaCrtFromConsoleSecret(secretToUse, customResource.Namespace, client)
+				if err != nil {
+					return err
+				}
+
+				clog.Info("[debug] creating the route for ocnsole")
+				routeDefinition, err := routes.NewRouteDefinitionForCR(existing, namespacedName, serviceRoutelabels, targetServiceName, targetPortName, customResource.Spec.IngressDomain, brokerHost, console.SSLEnabled, console.TlsTermination.Type, makeAnnotations(console.TlsTermination.Annotations), client, consoleCaCrt)
+				if err != nil {
+					return err
+				}
+				clog.Info("[debug] tracking it")
 				reconciler.trackDesired(routeDefinition)
 
 			} else {
@@ -982,11 +1066,24 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) configureConsoleExposure(custom
 					existing = obj.(*netv1.Ingress)
 				}
 				brokerHost := formatIngressHost(customResource, customResource.Spec.Console.IngressHost, ordinalString, consoleName, "ing")
-				ingressDefinition := ingresses.NewIngressForCRWithSSL(existing, namespacedName, serviceRoutelabels, targetServiceName, targetPortName, console.SSLEnabled, customResource.Spec.IngressDomain, brokerHost)
+				ingressDefinition, err := ingresses.NewIngressForCRWithSSL(existing, namespacedName, serviceRoutelabels, targetServiceName, targetPortName, console.SSLEnabled, customResource.Spec.IngressDomain, brokerHost, console.TlsTermination.Type, makeAnnotations(console.TlsTermination.Annotations), client)
+
+				if err != nil {
+					return err
+				}
 				reconciler.trackDesired(ingressDefinition)
 			}
 		}
 	}
+	return nil
+}
+
+func makeAnnotations(kvs []brokerv1beta1.KeyValueType) map[string]string {
+	annotations := make(map[string]string)
+	for _, kv := range kvs {
+		annotations[kv.Key] = *kv.Value
+	}
+	return annotations
 }
 
 func formatIngressHost(customResource *brokerv1beta1.ActiveMQArtemis, ingressHost string, brokerOrdinal string, itemName string, resType string) string {
@@ -3210,4 +3307,63 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) MakeSecretFromCertTlsSecret(cer
 		secretDef = secrets.MakeSecretWithData(targetSecretNamespacedName, targetSecretName, dataMap, nil)
 	}
 	return secretDef, nil
+}
+
+func extractCaCrtFromConsoleSecret(secretToUse *corev1.Secret, namespace string, client rtclient.Client) ([]byte, error) {
+	if secretToUse == nil {
+		//console is not sslEnabled
+		return nil, nil
+	}
+
+	clog.Info("[debug] dumping secret", "name", secretToUse.Name, "len data", len(secretToUse.Data), "len stringdata", len(secretToUse.StringData))
+
+	var keyStore, password []byte
+	if len(secretToUse.StringData) > 0 {
+		// check if StringData ever used, if not we may just use Data for all cases
+		clog.Info("[debug] using stringDATA")
+		keyStore = []byte(secretToUse.StringData["broker.ks"])
+		password = []byte(secretToUse.StringData["keyStorePassword"])
+	} else {
+		clog.Info("[debug] using DATA")
+		// keystore content is a java keystore (pkcs12 or jks)
+		keyStore = secretToUse.Data["broker.ks"]
+		password = secretToUse.Data["keyStorePassword"]
+		clog.Info("[debug] keystore as base64", "value", base64.RawStdEncoding.EncodeToString(keyStore))
+		clog.Info("[debug] password as base64", "value", base64.RawStdEncoding.EncodeToString(password))
+	}
+
+	// as we don't know the type of store we need to try
+	// assuming pkcs12 first
+	_, ca, _, err := pkcs12.DecodeChain([]byte(keyStore), string(password))
+	if err == nil {
+		out := new(bytes.Buffer)
+		err = pem.Encode(out, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: ca.Raw,
+		})
+
+		return out.Bytes(), err
+	}
+	// try jks keystore
+	reader := bytes.NewReader([]byte(keyStore))
+	jksKeystore := keystore.New()
+	if err := jksKeystore.Load(reader, []byte(password)); err != nil {
+		return nil, err
+	}
+
+	alias := jksKeystore.Aliases()
+	certs, err := jksKeystore.GetPrivateKeyEntryCertificateChain(alias[0])
+	if err != nil {
+		return nil, err
+	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("No certs in jks keystore")
+	}
+	out := new(bytes.Buffer)
+	err = pem.Encode(out, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certs[len(certs)-1].Content,
+	})
+
+	return out.Bytes(), err
 }

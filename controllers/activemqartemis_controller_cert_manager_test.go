@@ -16,16 +16,21 @@ limitations under the License.
 package controllers
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"os"
 
 	brokerv1beta1 "github.com/artemiscloud/activemq-artemis-operator/api/v1beta1"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/resources/routes"
+	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/certutil"
 	"github.com/artemiscloud/activemq-artemis-operator/pkg/utils/common"
 	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	cmmetav1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,6 +57,13 @@ var (
 	jksPassword                           = "jks-password"
 	adminUser                             = "testuser"
 	adminPassword                         = "testpassword"
+	ingressTypePassThrough                = "passthrough"
+	ingressTypeEdge                       = "edge"
+	routeTypeReencrypt                    = "reencrypt"
+	issuerForIngress                      = "selfsigned-issuer-ingress"
+	issuerKind                            = "Issuer"
+	ingressCommonName                     = "arkamq.io"
+	userKeystoreSecretName                = "user-common-tls-secret"
 )
 
 var _ = Describe("artemis controller with cert manager test", Label("controller-cert-mgr-test"), func() {
@@ -61,6 +73,10 @@ var _ = Describe("artemis controller with cert manager test", Label("controller-
 		if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
 			//if cert manager is not installed, install it
 			if !CertManagerInstalled() {
+				if isOpenshift {
+					//openshift need install cert-manager from operatorHUB
+					Fail("Please install cert-manager from operatorHub and also manually install openshift-route")
+				}
 				Expect(InstallCertManager()).To(Succeed())
 				installedCertManager = true
 			}
@@ -250,8 +266,687 @@ var _ = Describe("artemis controller with cert manager test", Label("controller-
 				}
 			})
 		})
+
+		Context("tls ingress exposure with cert manager and local issuer", func() {
+			BeforeEach(func() {
+				if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+					InstallSelfSignIssuer(issuerForIngress)
+					InstallSecret(cmCommonSecretName, defaultNamespace, func(candidate *corev1.Secret) {
+						candidate.StringData[pkcsPasswordKey] = pkcsPassword
+						candidate.StringData[jksPasswordKey] = jksPassword
+					})
+					InstallSelfSignedCert(serverCertWithPkcs12Name, defaultNamespace, func(candidate *cmv1.Certificate) {
+						candidate.Spec.Keystores = &cmv1.CertificateKeystores{
+							PKCS12: &cmv1.PKCS12Keystore{
+								Create: true,
+								PasswordSecretRef: cmmetav1.SecretKeySelector{
+									LocalObjectReference: cmmetav1.LocalObjectReference{
+										Name: cmCommonSecretName,
+									},
+									Key: pkcsPasswordKey,
+								},
+							},
+						}
+						candidate.Spec.DNSNames = []string{brokerCrName + "-ss-0"}
+						candidate.Spec.IssuerRef = cmmetav1.ObjectReference{
+							Name: selfsignedIssuerName,
+							Kind: "Issuer",
+						}
+					})
+				}
+			})
+			AfterEach(func() {
+				if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+					UninstallSelfSignedCert(serverCertWithPkcs12Name, defaultNamespace)
+					UninstallSecret(cmCommonSecretName, defaultNamespace)
+					UninstallSelfSignIssuer(issuerForIngress)
+				}
+			})
+			It("test console exposure with cert-manager", Label("console-expose-cert-manager"), func() {
+				if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+					if isOpenshift {
+						testRouteTlsTerminateWithCertManager()
+					} else {
+						testIngressTlsTerminateWithCertManager()
+					}
+				}
+			})
+			It("test console exposure without cert-manager", Label("console-expose-no-cert-manager"), func() {
+				if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
+					if isOpenshift {
+						testRouteTlsTerminateWithoutCertManager()
+					} else {
+						testIngressTlsTerminateWithoutCertManager()
+					}
+				}
+			})
+
+		})
 	})
 })
+
+func testIngressTlsTerminateWithoutCertManager() {
+	By("creating user secret")
+	//each pod need a separate secret where the cert's common name matches host name
+	//otherwise ingress refuses to use it
+	hostName := brokerCrName + "-wconsj-0-svc-ing.apps.artemiscloud.io"
+	tlsKeyPemBytes, tlsCrtPemBytes, err := GeneratePemCertificate(func(cert *x509.Certificate) {
+		cert.Subject.CommonName = hostName
+	})
+	Expect(err).To(BeNil())
+
+	userIngressTlsSecretName := hostName + "-secret"
+	userIngressTlsSecret := InstallSecret(userIngressTlsSecretName, defaultNamespace, func(candidate *corev1.Secret) {
+		candidate.StringData["tls.key"] = string(tlsKeyPemBytes)
+		candidate.StringData["tls.crt"] = string(tlsCrtPemBytes)
+		candidate.Type = corev1.SecretTypeTLS
+	})
+
+	By("Deploying the broker cr exposing console with edge terminaion")
+	brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = false
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypeEdge,
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+
+		ingName := brokerCr.Name + "-wconsj-0-svc-ing"
+		ingress := netv1.Ingress{}
+		ingKey := types.NamespacedName{Name: ingName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, ingKey, &ingress)).Should(Succeed())
+
+		g.Expect(len(ingress.Spec.TLS)).To(BeEquivalentTo(1))
+		tls0 := ingress.Spec.TLS[0]
+		g.Expect(tls0.SecretName).To(Equal(userIngressTlsSecret.Name))
+		g.Expect(tls0.Hosts[0]).To(Equal(hostName))
+
+		ingSecretKey := types.NamespacedName{Name: hostName + "-secret", Namespace: defaultNamespace}
+		ingSecret := corev1.Secret{}
+		g.Expect(k8sClient.Get(ctx, ingSecretKey, &ingSecret)).Should(Succeed())
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+	CleanResource(userIngressTlsSecret, userIngressTlsSecretName, userIngressTlsSecret.Namespace)
+}
+
+func testRouteTlsTerminateWithoutCertManager() {
+	By("creating user secret")
+	userSecret, err := CreateTlsSecret(userKeystoreSecretName, defaultNamespace, "password", nil)
+	Expect(err).To(Succeed())
+	Expect(k8sClient.Create(ctx, userSecret)).Should(Succeed())
+	secretKey := types.NamespacedName{Name: userKeystoreSecretName, Namespace: defaultNamespace}
+	theSecret := &corev1.Secret{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, secretKey, theSecret)).Should(Succeed())
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	By("deploying broker exposing console reencrypt with user sslsecret")
+	brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.SSLSecret = userKeystoreSecretName
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &routeTypeReencrypt,
+		}
+	})
+
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue), condition.Message)
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationReencrypt))
+		g.Expect(route.Spec.TLS.DestinationCACertificate).NotTo(BeEmpty())
+		g.Expect(route.Spec.TLS.DestinationCACertificate).To(ContainSubstring("BEGIN CERTIFICATE"))
+		cert, err := certutil.ParsePemCertificate(&route.Spec.TLS.DestinationCACertificate, &pkcsPassword)
+		g.Expect(err).To(Succeed())
+		g.Expect(cert.Subject.CommonName).To(Equal("ArtemisCloud Broker"))
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+
+	By("deploying broker exposing console passthrough with user sslsecret")
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.SSLSecret = userKeystoreSecretName
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypePassThrough,
+		}
+	})
+
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue), condition.Message)
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationPassthrough))
+
+		By("checking jolokia access")
+		pod0Name := createdBrokerCr.Name + "-ss-0"
+		Eventually(func(g Gomega) {
+			checkReadPodStatus(pod0Name, createdBrokerCr.Name, g)
+		}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+	CleanResource(theSecret, theSecret.Name, theSecret.Namespace)
+
+	By("Deploying broker exposing console reencrypt no cert manager")
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.BrokerCert = &serverCertWithPkcs12Name
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &routeTypeReencrypt,
+		}
+	})
+
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue), condition.Message)
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationReencrypt))
+		g.Expect(route.Spec.TLS.DestinationCACertificate).NotTo(BeEmpty())
+		g.Expect(route.Spec.TLS.DestinationCACertificate).To(ContainSubstring("BEGIN CERTIFICATE"))
+		cert, err := certutil.ParsePemCertificate(&route.Spec.TLS.DestinationCACertificate, &pkcsPassword)
+		g.Expect(err).To(Succeed())
+		g.Expect(cert.Subject.CommonName).To(Equal("arkmq.org"))
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+}
+
+func testRouteTlsTerminateWithCertManager() {
+
+	By("Deploying the broker cr exposing console sslEnabled with invalid cert-manager annotation")
+	brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.BrokerCert = &serverCertWithPkcs12Name
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypePassThrough,
+			Annotations: []brokerv1beta1.KeyValueType{
+				{
+					Key:   routes.CM_ANN_ISSUER,
+					Value: &issuerForIngress,
+				},
+			},
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+		g.Expect(condition.Message).Should(ContainSubstring("no cert-manager annotation is allowed for ssl passthough type route"))
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+
+	By("Deploying the broker cr exposing console sslEnabled without cert-manager annotations")
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.BrokerCert = &serverCertWithPkcs12Name
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypePassThrough,
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue), condition.Message)
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationPassthrough))
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+
+	By("Deploying the broker cr exposing console on edge route without cert-mgr and user secret")
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = false
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypeEdge,
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationEdge))
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+
+	By("Deploying the broker cr exposing console on edge route with user secret")
+	tlsKeyPemBytes, tlsCrtPemBytes, err := GeneratePemCertificate(nil)
+	Expect(err).To(BeNil())
+	_, caCrtPemBytes, err := GeneratePemCertificate(func(ca *x509.Certificate) {
+		ca.IsCA = true
+	})
+	Expect(err).To(BeNil())
+
+	userRouteTlsSecretName := brokerCrName + "-wconsj-0-svc-rte.apps.artemiscloud.io-secret"
+	userRouteTlsSecret := InstallSecret(userRouteTlsSecretName, defaultNamespace, func(candidate *corev1.Secret) {
+		candidate.StringData["tls.key"] = string(tlsKeyPemBytes)
+		candidate.StringData["tls.crt"] = string(tlsCrtPemBytes)
+		candidate.StringData["ca.crt"] = string(caCrtPemBytes)
+	})
+
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = false
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypeEdge,
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationEdge))
+		g.Expect(route.Spec.TLS.Key).ShouldNot(BeEmpty())
+		g.Expect(route.Spec.TLS.Key).Should(ContainSubstring("BEGIN RSA PRIVATE KEY"))
+		g.Expect(route.Spec.TLS.Key).Should(ContainSubstring("END RSA PRIVATE KEY"))
+		g.Expect(route.Spec.TLS.Certificate).ShouldNot(BeEmpty())
+		g.Expect(route.Spec.TLS.Certificate).Should(ContainSubstring("BEGIN CERTIFICATE"))
+		g.Expect(route.Spec.TLS.Certificate).Should(ContainSubstring("END CERTIFICATE"))
+		g.Expect(route.Spec.TLS.CACertificate).ShouldNot(BeEmpty())
+		g.Expect(route.Spec.TLS.CACertificate).Should(ContainSubstring("BEGIN CERTIFICATE"))
+		g.Expect(route.Spec.TLS.CACertificate).Should(ContainSubstring("END CERTIFICATE"))
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+	CleanResource(userRouteTlsSecret, userRouteTlsSecret.Name, userRouteTlsSecret.Namespace)
+	/*
+	   By("Deploying the broker cr exposing console with cert-manager on edge route")
+	   brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+	   		candidate.Name = brokerCrName
+	   		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+	   		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+	   			InitialDelaySeconds: 1,
+	   			PeriodSeconds:       1,
+	   			TimeoutSeconds:      5,
+	   		}
+	   		candidate.Spec.Console.Expose = true
+	   		candidate.Spec.Console.SSLEnabled = false
+	   		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+	   			Type: &ingressTypeEdge,
+	   			Annotations: []brokerv1beta1.KeyValueType{
+	   				{
+	   					Key:   "cert-manager.io/issuer-name",
+	   					Value: &issuerForIngress,
+	   				},
+	   				{
+	   					Key:   "cert-manager.io/issuer-kind",
+	   					Value: &issuerKind,
+	   				},
+	   				{
+	   					Key:   "cert-manager.io/common-name",
+	   					Value: &ingressCommonName,
+	   				},
+	   			},
+	   		}
+	   	})
+
+	   By("Checking the broker status reflect the truth")
+
+	   	Eventually(func(g Gomega) {
+	   		crdRef := types.NamespacedName{
+	   			Namespace: brokerCr.Namespace,
+	   			Name:      brokerCr.Name,
+	   		}
+	   		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+	   		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+	   		g.Expect(condition).NotTo(BeNil())
+	   		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+
+	   		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+	   		route := routev1.Route{}
+	   		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+	   		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+	   		issuerAnnotation, ok := route.Annotations[routes.CM_ANN_ISSUER]
+	   		g.Expect(ok).To(BeTrue())
+	   		g.Expect(issuerAnnotation).To(Equal(issuerForIngress))
+	   		issuerKindAnnotation, ok := route.Annotations[routes.CM_ANN_ISSUER_KIND]
+	   		g.Expect(ok).To(BeTrue())
+	   		g.Expect(issuerKindAnnotation).To(Equal(issuerKind))
+	   		commonNameAnnotation, ok := route.Annotations["cert-manager.io/common-name"]
+	   		g.Expect(ok).To(BeTrue())
+	   		g.Expect(commonNameAnnotation).To(Equal(ingressCommonName))
+	   		g.Expect(route.Spec.TLS.Key).To(Equal("xyz"))
+	   	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	   CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+	*/
+
+	By("Deploying the broker cr exposing console on reencrypt route with user secret")
+	_, caCrtPemBytes, err = GeneratePemCertificate(func(ca *x509.Certificate) {
+		ca.IsCA = true
+	})
+	Expect(err).To(BeNil())
+
+	userRouteTlsSecretName = brokerCrName + "-wconsj-0-svc-rte.apps.artemiscloud.io-secret"
+	userRouteTlsSecret = InstallSecret(userRouteTlsSecretName, defaultNamespace, func(candidate *corev1.Secret) {
+		candidate.StringData["tls.key"] = string(tlsKeyPemBytes)
+		candidate.StringData["tls.crt"] = string(tlsCrtPemBytes)
+		candidate.StringData["ca.crt"] = string(caCrtPemBytes)
+	})
+
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.BrokerCert = &serverCertWithPkcs12Name
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &routeTypeReencrypt,
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+
+		rteName := brokerCr.Name + "-wconsj-0-svc-rte"
+		route := routev1.Route{}
+		rteKey := types.NamespacedName{Name: rteName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, rteKey, &route)).Should(Succeed())
+
+		g.Expect(route.Spec.TLS.Termination).Should(Equal(routev1.TLSTerminationReencrypt))
+		g.Expect(route.Spec.TLS.Key).ShouldNot(BeEmpty())
+		g.Expect(route.Spec.TLS.Key).Should(ContainSubstring("BEGIN RSA PRIVATE KEY"))
+		g.Expect(route.Spec.TLS.Key).Should(ContainSubstring("END RSA PRIVATE KEY"))
+		g.Expect(route.Spec.TLS.Certificate).ShouldNot(BeEmpty())
+		g.Expect(route.Spec.TLS.Certificate).Should(ContainSubstring("BEGIN CERTIFICATE"))
+		g.Expect(route.Spec.TLS.Certificate).Should(ContainSubstring("END CERTIFICATE"))
+		g.Expect(route.Spec.TLS.DestinationCACertificate).ShouldNot(BeEmpty())
+		g.Expect(route.Spec.TLS.DestinationCACertificate).Should(ContainSubstring("BEGIN CERTIFICATE"))
+		g.Expect(route.Spec.TLS.DestinationCACertificate).Should(ContainSubstring("END CERTIFICATE"))
+
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+	CleanResource(userRouteTlsSecret, userRouteTlsSecret.Name, userRouteTlsSecret.Namespace)
+}
+
+func testIngressTlsTerminateWithCertManager() {
+	By("Deploying the broker cr exposing console sslEnabled with invalid cert-manager annotation")
+	brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = true
+		candidate.Spec.Console.BrokerCert = &serverCertWithPkcs12Name
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypePassThrough,
+			Annotations: []brokerv1beta1.KeyValueType{
+				{
+					Key:   "cert-manager.io/issuer",
+					Value: &issuerForIngress,
+				},
+			},
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
+		g.Expect(condition.Message).Should(ContainSubstring("no cert-manager annotation is allowed for ssl passthough type ingress"))
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+
+	By("Deploying the broker cr exposing console with cert-manager")
+	brokerCr, createdBrokerCr = DeployCustomBroker(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemis) {
+
+		candidate.Name = brokerCrName
+		candidate.Spec.DeploymentPlan.Size = common.Int32ToPtr(1)
+		candidate.Spec.DeploymentPlan.ReadinessProbe = &corev1.Probe{
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+			TimeoutSeconds:      5,
+		}
+		candidate.Spec.Console.Expose = true
+		candidate.Spec.Console.SSLEnabled = false
+		candidate.Spec.Console.TlsTermination = brokerv1beta1.TlsTerminationType{
+			Type: &ingressTypeEdge,
+			Annotations: []brokerv1beta1.KeyValueType{
+				{
+					Key:   "cert-manager.io/issuer",
+					Value: &issuerForIngress,
+				},
+				{
+					Key:   "cert-manager.io/common-name",
+					Value: &ingressCommonName,
+				},
+			},
+		}
+	})
+	By("Checking the broker status reflect the truth")
+	ingSecret := corev1.Secret{}
+	Eventually(func(g Gomega) {
+		crdRef := types.NamespacedName{
+			Namespace: brokerCr.Namespace,
+			Name:      brokerCr.Name,
+		}
+		g.Expect(k8sClient.Get(ctx, crdRef, createdBrokerCr)).Should(Succeed())
+
+		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
+		g.Expect(condition).NotTo(BeNil())
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionTrue))
+
+		ingName := brokerCr.Name + "-wconsj-0-svc-ing"
+		ingress := netv1.Ingress{}
+		ingKey := types.NamespacedName{Name: ingName, Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, ingKey, &ingress)).Should(Succeed())
+
+		issuerAnnotation, ok := ingress.Annotations["cert-manager.io/issuer"]
+		g.Expect(ok).To(BeTrue())
+		g.Expect(issuerAnnotation).To(Equal(issuerForIngress))
+		commonNameAnnotation, ok := ingress.Annotations["cert-manager.io/common-name"]
+		g.Expect(ok).To(BeTrue())
+		g.Expect(commonNameAnnotation).To(Equal(ingressCommonName))
+		hostName := brokerCr.Name + "-wconsj-0-svc-ing.apps.artemiscloud.io"
+		ingSecretKey := types.NamespacedName{Name: hostName + "-secret", Namespace: defaultNamespace}
+		g.Expect(k8sClient.Get(ctx, ingSecretKey, &ingSecret)).Should(Succeed())
+	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+	CleanResource(createdBrokerCr, brokerCr.Name, createdBrokerCr.Namespace)
+	CleanResource(&ingSecret, ingSecret.Name, ingSecret.Namespace)
+}
 
 func checkReadPodStatus(podName string, crName string, g Gomega) {
 	curlUrl := "https://" + podName + ":8161/console/jolokia/read/org.apache.activemq.artemis:broker=\"amq-broker\"/Status"
@@ -304,7 +999,7 @@ func testCertWithNoKeystoreConfigured(certLoc string) {
 
 		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
 		g.Expect(condition).NotTo(BeNil())
-		g.Expect(condition.Status).Should(Equal(metav1.ConditionUnknown))
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
 		g.Expect(condition.Message).Should(ContainSubstring("doesn't have keystore options configured"))
 	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
@@ -343,7 +1038,7 @@ func testCertWithNoKeystoreConfigured(certLoc string) {
 
 		condition := meta.FindStatusCondition(createdBrokerCr.Status.Conditions, brokerv1beta1.DeployedConditionType)
 		g.Expect(condition).NotTo(BeNil())
-		g.Expect(condition.Status).Should(Equal(metav1.ConditionUnknown))
+		g.Expect(condition.Status).Should(Equal(metav1.ConditionFalse))
 		g.Expect(condition.Message).Should(ContainSubstring("doesn't have keystore options configured"))
 	}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 

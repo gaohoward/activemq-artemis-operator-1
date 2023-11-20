@@ -86,6 +86,41 @@ var _ = Describe("Address controller tests", func() {
 				CleanResource(createdAddressCr, addressCr.Name, defaultNamespace)
 			})
 
+			It("Verifying the lscrs secret is gone after deleting address CR", Label("delete-secret-check"), func() {
+				By("deploy a broker cr")
+				brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, nil)
+
+				By("deploy an address cr")
+				addressCr, createdAddressCr := DeployCustomAddress(defaultNamespace, func(candidate *brokerv1beta1.ActiveMQArtemisAddress) {
+					candidate.Spec.AddressName = addressName
+					candidate.Spec.QueueName = &queueName
+					candidate.Spec.RoutingType = &anycastType
+				})
+
+				By("verify the configurationManaged attribute of the queue is true")
+				podOrdinal := strconv.FormatInt(0, 10)
+				podName := namer.CrToSS(brokerCr.Name) + "-" + podOrdinal
+
+				CheckQueueExistInPod(brokerCr.Name, podName, queueName, defaultNamespace)
+				Eventually(func(g Gomega) {
+					expectedSecuritySecret := &corev1.Secret{}
+					expectedSecuritySecretKey := types.NamespacedName{Name: "secret-address-" + brokerCr.Name, Namespace: defaultNamespace}
+					g.Expect(k8sClient.Get(ctx, expectedSecuritySecretKey, expectedSecuritySecret)).Should(Succeed())
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				CleanResource(createdAddressCr, addressCr.Name, defaultNamespace)
+
+				Eventually(func(g Gomega) {
+					expectedSecuritySecret := &corev1.Secret{}
+					expectedSecuritySecretKey := types.NamespacedName{Name: "secret-address-" + brokerCr.Name, Namespace: defaultNamespace}
+					g.Expect(k8sClient.Get(ctx, expectedSecuritySecretKey, expectedSecuritySecret)).ShouldNot(Succeed())
+				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
+
+				//cleanup
+				CleanResource(createdBrokerCr, brokerCr.Name, defaultNamespace)
+				CleanResource(createdAddressCr, addressCr.Name, defaultNamespace)
+			})
+
 			It("configurationManaged default should be true (with queue configuration)", func() {
 				By("deploy a broker cr")
 				brokerCr, createdBrokerCr := DeployCustomBroker(defaultNamespace, nil)
@@ -360,6 +395,7 @@ var _ = Describe("Address controller tests", func() {
 						g.Expect(stdOutContent).ShouldNot(ContainSubstring(addressName))
 					}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 				}
+
 			}
 
 			// cleanup

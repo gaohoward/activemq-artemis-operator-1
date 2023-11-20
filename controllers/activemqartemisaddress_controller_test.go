@@ -95,6 +95,7 @@ var _ = Describe("Address controller tests", func() {
 					candidate.Spec.AddressName = addressName
 					candidate.Spec.QueueName = &queueName
 					candidate.Spec.RoutingType = &anycastType
+					candidate.Spec.RemoveFromBrokerOnDelete = true
 				})
 
 				By("verify the configurationManaged attribute of the queue is true")
@@ -104,21 +105,22 @@ var _ = Describe("Address controller tests", func() {
 				CheckQueueExistInPod(brokerCr.Name, podName, queueName, defaultNamespace)
 				Eventually(func(g Gomega) {
 					expectedSecuritySecret := &corev1.Secret{}
-					expectedSecuritySecretKey := types.NamespacedName{Name: "secret-address-" + brokerCr.Name, Namespace: defaultNamespace}
+					expectedSecuritySecretKey := types.NamespacedName{Name: "secret-address-" + addressCr.Name, Namespace: defaultNamespace}
 					g.Expect(k8sClient.Get(ctx, expectedSecuritySecretKey, expectedSecuritySecret)).Should(Succeed())
 				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
+				By("delete the address cr " + addressCr.Name)
 				CleanResource(createdAddressCr, addressCr.Name, defaultNamespace)
 
 				Eventually(func(g Gomega) {
 					expectedSecuritySecret := &corev1.Secret{}
-					expectedSecuritySecretKey := types.NamespacedName{Name: "secret-address-" + brokerCr.Name, Namespace: defaultNamespace}
+					expectedSecuritySecretKey := types.NamespacedName{Name: "secret-address-" + addressCr.Name, Namespace: defaultNamespace}
 					g.Expect(k8sClient.Get(ctx, expectedSecuritySecretKey, expectedSecuritySecret)).ShouldNot(Succeed())
 				}, existingClusterTimeout, existingClusterInterval).Should(Succeed())
 
 				//cleanup
+				By("clean up resources")
 				CleanResource(createdBrokerCr, brokerCr.Name, defaultNamespace)
-				CleanResource(createdAddressCr, addressCr.Name, defaultNamespace)
 			})
 
 			It("configurationManaged default should be true (with queue configuration)", func() {

@@ -16,16 +16,11 @@ jobs:
           sudo apt-get update &&
           sudo apt-get install pass
 
-      - name: Checkout artemiscloud.github.io
+      - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          repository: ${{ github.repository_owner }}/artemiscloud.github.io
-          path: artemiscloud.github.io
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub release
         run: |
-          cd artemiscloud.github.io
           echo "list dir"
           ls
           echo "find tag"

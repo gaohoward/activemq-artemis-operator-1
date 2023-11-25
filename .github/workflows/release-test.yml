@@ -24,6 +24,7 @@ jobs:
           echo "list dir"
           ls -a
           git branch
+          git fetch --tags --force
           git log -n 2
 
           RELEASE_TAG="$(git describe --exact-match --tags)"

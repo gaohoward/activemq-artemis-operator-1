@@ -26,6 +26,11 @@ jobs:
       - name: Create GitHub release
         run: |
           cd artemiscloud.github.io
+          echo "list dir"
+          ls
+          echo "find tag"
+          git tag | grep v1.0.1
+
           RELEASE_TAG="$(git describe --exact-match --tags)"
 
           RELEASE_ID=$(curl -v -L -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \

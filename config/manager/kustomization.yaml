@@ -18,4 +18,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/hgao/operator
-  newTag: cert-ing
+  newTag: cert-route

@@ -1071,5 +1071,20 @@ spec:
 
 Note: Unless the certificate is in the same namespace as the operator's, it is required that the operator be installed watching all namespaces in order for the operator to be able to retrieve the certificate.
 
+### Configuring TLS for Ingresses and Openshift Routes
+
+#### Ingress TLS Edge termination
+
+You can use a cert-manager certificate to secure an ingress that exposes the management console, accetpors and connectors.
+
+Ingresses support Edge type termination, meaning that the communication between external broker clients and the Ingress is TLS secured but the communication between Ingress and the internal target service is plain HTTP.
+
+For example to secure the Ingress that exposes the broker's admin console
+
+```yaml
+
+
+```
+
 For details on how to use cert-manager to manage your certificates please refer to its [documentation](https://cert-manager.io/docs/).
 

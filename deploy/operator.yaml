@@ -99,7 +99,7 @@ spec:
               fieldPath: metadata.namespace
         - name: ENABLE_WEBHOOKS
           value: "false"
-        image: quay.io/hgao/operator:cert-ing
+        image: quay.io/hgao/operator:cert-route
         livenessProbe:
           httpGet:
             path: /healthz

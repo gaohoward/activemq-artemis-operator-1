@@ -876,7 +876,7 @@ func InstallCert(certName string, namespace string, customFunc func(candidate *c
 	return &cmCert
 }
 
-func InstallCaBundle(name string, sourceSecret string, caTrustStoreName string) *tm.Bundle {
+func InstallCaBundle(name string, sourceSecret string, caFileName string) *tm.Bundle {
 	bundle := tm.Bundle{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "trust.cert-manager.io/v1alpha1",
@@ -898,13 +898,8 @@ func InstallCaBundle(name string, sourceSecret string, caTrustStoreName string) 
 				},
 			},
 			Target: tm.BundleTarget{
-				ConfigMap: &tm.KeySelector{
-					Key: "trust-bundle.pem",
-				},
-				AdditionalFormats: &tm.AdditionalFormats{
-					JKS: &tm.KeySelector{
-						Key: caTrustStoreName,
-					},
+				Secret: &tm.KeySelector{
+					Key: caFileName,
 				},
 			},
 		},

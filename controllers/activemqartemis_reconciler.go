@@ -829,7 +829,7 @@ func (reconciler *ActiveMQArtemisReconcilerImpl) generateConnectorsString(custom
 			if err != nil {
 				return "", err
 			}
-			connectorEntry = connectorEntry + ";" + sslOpts
+			connectorEntry = connectorEntry + "?" + sslOpts
 
 			sslOptionalArguments := reconciler.generateConnectorSSLOptionalArguments(connector, sslArgs, currentSS)
 
